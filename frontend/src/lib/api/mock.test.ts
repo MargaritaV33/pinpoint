@@ -153,6 +153,14 @@ describe("mock api: pins and threads", () => {
   });
 });
 
+describe("mock api: image object urls", () => {
+  it("resolves a data: url unchanged, needing no auth", async () => {
+    const { images } = await api.getGuestRoom("lakeside-demo");
+    const resolved = await api.getImageObjectUrl(images[0].url);
+    expect(resolved).toBe(images[0].url);
+  });
+});
+
 describe("export", () => {
   it("lists only open pins grouped by image", async () => {
     await login();

@@ -4,6 +4,7 @@ import { clientToPercent, percentToStyle, type PercentPoint } from "@/lib/pins/c
 import { cn } from "@/lib/utils";
 import { PinBadge, pinLabel } from "./PinMarker";
 import type { PinType } from "@/lib/api";
+import { useImageSrc } from "./useImageSrc";
 
 interface Props {
   image: RenderImage;
@@ -17,6 +18,7 @@ interface Props {
 
 export function ImageViewer({ image, pins, selectedPinId, draft, onSelectPin, onPlace }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
+  const src = useImageSrc(image);
 
   function handleClick(e: React.MouseEvent) {
     if (!onPlace || !imgRef.current) return;
@@ -27,16 +29,18 @@ export function ImageViewer({ image, pins, selectedPinId, draft, onSelectPin, on
   return (
     <div className="flex h-full w-full items-center justify-center overflow-auto bg-stage p-6">
       <div className={cn("relative", onPlace && "cursor-crosshair")} onClick={handleClick}>
-        <img
-          ref={imgRef}
-          src={image.url}
-          alt={image.title}
-          draggable={false}
-          className={cn(
-            "block max-h-[calc(100vh-10rem)] max-w-full select-none rounded-sm shadow-2xl",
-            image.superseded && "opacity-60 grayscale-[40%]",
-          )}
-        />
+        {src && (
+          <img
+            ref={imgRef}
+            src={src}
+            alt={image.title}
+            draggable={false}
+            className={cn(
+              "block max-h-[calc(100vh-10rem)] max-w-full select-none rounded-sm shadow-2xl",
+              image.superseded && "opacity-60 grayscale-[40%]",
+            )}
+          />
+        )}
         {pins.map((pin) => (
           <button
             key={pin.id}

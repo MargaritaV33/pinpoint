@@ -1,12 +1,52 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ImageIcon, Layers } from "lucide-react";
-import type { PinType, Role, RoomDetail } from "@/lib/api";
+import type { PinType, Role, RenderImage, RoomDetail } from "@/lib/api";
 import type { PercentPoint } from "@/lib/pins/coords";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ImageViewer } from "./ImageViewer";
 import { PIN_FILTERS, filterPins, getSessionFilter, openPinCountsByImage, setSessionFilter, type PinFilter } from "@/lib/pins/filter";
 import { NewPinForm, PinList, PinThread } from "./ThreadPanel";
+import { useImageSrc } from "./useImageSrc";
+
+/** One thumbnail-rail entry. A separate component so each image gets its
+ * own `useImageSrc` hook call (hooks can't be called inside `.map`). */
+function ThumbnailButton({
+  img,
+  idx,
+  active,
+  openCount,
+  onSelect,
+}: {
+  img: RenderImage;
+  idx: number;
+  active: boolean;
+  openCount: number;
+  onSelect: () => void;
+}) {
+  const src = useImageSrc(img);
+  return (
+    <button
+      onClick={onSelect}
+      title={img.title}
+      className={cn(
+        "group relative overflow-hidden rounded-md ring-2 transition",
+        active ? "ring-stage-foreground" : "ring-transparent opacity-70 hover:opacity-100",
+      )}
+    >
+      {src && <img src={src} alt="" className={cn("aspect-[4/3] w-full object-cover", img.superseded && "grayscale")} />}
+      <span className="absolute left-1 top-1 rounded bg-stage/80 px-1.5 text-[10px] text-stage-foreground">{idx + 1}</span>
+      {openCount > 0 && (
+        <span className="absolute right-1 top-1 rounded-full bg-pin-fix px-1.5 text-[10px] font-semibold text-pin-foreground">{openCount}</span>
+      )}
+      {img.superseded && (
+        <span className="absolute inset-x-0 bottom-0 bg-stage/85 py-0.5 text-center text-[9px] uppercase tracking-wider text-stage-foreground">
+          Superseded
+        </span>
+      )}
+    </button>
+  );
+}
 
 interface Props {
   role: Role;
@@ -58,31 +98,16 @@ export function Workspace({ role, detail, readOnly, emptyState, onCreatePin, onR
     <div className="grid min-h-0 flex-1 grid-cols-[84px_1fr_320px] lg:grid-cols-[104px_1fr_380px]">
       {/* Image rail */}
       <nav aria-label="Renders" className="flex flex-col gap-3 overflow-y-auto border-r border-stage-muted bg-stage p-3">
-        {images.map((img, idx) => {
-          const open = img.superseded ? 0 : (openCounts[img.id] ?? 0);
-          return (
-            <button
-              key={img.id}
-              onClick={() => switchImage(img.id)}
-              title={img.title}
-              className={cn(
-                "group relative overflow-hidden rounded-md ring-2 transition",
-                img.id === activeId ? "ring-stage-foreground" : "ring-transparent opacity-70 hover:opacity-100",
-              )}
-            >
-              <img src={img.url} alt="" className={cn("aspect-[4/3] w-full object-cover", img.superseded && "grayscale")} />
-              <span className="absolute left-1 top-1 rounded bg-stage/80 px-1.5 text-[10px] text-stage-foreground">{idx + 1}</span>
-              {open > 0 && (
-                <span className="absolute right-1 top-1 rounded-full bg-pin-fix px-1.5 text-[10px] font-semibold text-pin-foreground">{open}</span>
-              )}
-              {img.superseded && (
-                <span className="absolute inset-x-0 bottom-0 bg-stage/85 py-0.5 text-center text-[9px] uppercase tracking-wider text-stage-foreground">
-                  Superseded
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {images.map((img, idx) => (
+          <ThumbnailButton
+            key={img.id}
+            img={img}
+            idx={idx}
+            active={img.id === activeId}
+            openCount={img.superseded ? 0 : openCounts[img.id] ?? 0}
+            onSelect={() => switchImage(img.id)}
+          />
+        ))}
       </nav>
 
       {/* Stage */}

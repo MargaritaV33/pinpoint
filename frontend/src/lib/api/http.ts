@@ -90,6 +90,26 @@ export function createHttpApi(baseUrl: string): ApiClient {
       withAbsoluteImageUrl(baseUrl, await req<RenderImage>("PATCH", `/images/${enc(id)}`, { superseded })),
     setPinStatus: (id, status) => req("PATCH", `/pins/${enc(id)}`, { status }),
     addStudioComment: (pinId, text) => req("POST", `/pins/${enc(pinId)}/comments`, { text }),
+    async getImageObjectUrl(url) {
+      // Reuses the same Authorization header req() attaches elsewhere when
+      // a token is present. The studio endpoint (getRoomImageFile) requires
+      // it; the guest endpoint (getGuestImageFile, security: []) ignores it
+      // — harmless either way, per openapi.yaml's getImageObjectUrl note.
+      const headers: Record<string, string> = {};
+      const t = token();
+      if (t) headers["Authorization"] = `Bearer ${t}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        let msg = res.statusText;
+        try {
+          msg = (await res.json()).detail ?? msg;
+        } catch {
+          /* ignore */
+        }
+        throw new ApiError(res.status, String(msg));
+      }
+      return URL.createObjectURL(await res.blob());
+    },
     getGuestRoom: async (t) => withAbsoluteImageUrls(baseUrl, await req<RoomDetail>("GET", `/guest/${enc(t)}`)),
     createGuestPin: (t, input) => req("POST", `/guest/${enc(t)}/pins`, input),
     addGuestComment: (t, pinId, text, authorName) =>

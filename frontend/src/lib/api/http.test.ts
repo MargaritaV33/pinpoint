@@ -119,6 +119,36 @@ describe("http api: uploadImage multipart shape", () => {
   });
 });
 
+describe("http api: getImageObjectUrl", () => {
+  it("fetches with the Authorization header when a token is stored, and resolves an object URL", async () => {
+    localStorage.setItem(TOKEN_KEY, "tok-present");
+    const blob = new Blob(["bytes"], { type: "image/png" });
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(url).toBe(`${BASE}/rooms/r1/images/i1/file`);
+      expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer tok-present");
+      return { ok: true, status: 200, statusText: "200", blob: async () => blob } as unknown as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const createObjectURL = vi.fn(() => "blob:fake-object-url");
+    vi.stubGlobal("URL", { ...URL, createObjectURL });
+
+    const resolved = await createHttpApi(BASE).getImageObjectUrl(`${BASE}/rooms/r1/images/i1/file`);
+
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(resolved).toBe("blob:fake-object-url");
+  });
+
+  it("throws an ApiError with the backend's detail on a non-OK response", async () => {
+    const fetchMock = vi.fn(async () => makeResponse(401, { detail: "Invalid or expired token." }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createHttpApi(BASE).getImageObjectUrl(`${BASE}/rooms/r1/images/i1/file`)).rejects.toMatchObject({
+      status: 401,
+      message: "Invalid or expired token.",
+    });
+  });
+});
+
 describe("http api: path building and URL-encoding", () => {
   it("encodes id path segments for id-taking methods", async () => {
     const calls: string[] = [];

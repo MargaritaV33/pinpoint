@@ -37,6 +37,16 @@ export interface ApiClient {
   setPinStatus(pinId: string, status: Exclude<PinStatus, null>): Promise<Pin>;
   addStudioComment(pinId: string, text: string): Promise<Comment>;
 
+  /**
+   * Resolves a `RenderImage.url` to a URL an `<img src>` can actually load.
+   * `getRoomImageFile` (studio) requires the Authorization header a plain
+   * `<img>` tag cannot send, so `url` must be fetched with it and turned
+   * into an object URL (openapi.yaml's `RenderImage.url` description). The
+   * caller owns the result and must `URL.revokeObjectURL` it when done
+   * (see `useImageSrc.ts`).
+   */
+  getImageObjectUrl(url: string): Promise<string>;
+
   // ---- Guest (client) via guest token ----
   getGuestRoom(guestToken: string): Promise<RoomDetail>;
   createGuestPin(guestToken: string, input: CreatePinInput): Promise<Pin>;

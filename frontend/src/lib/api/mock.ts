@@ -296,6 +296,16 @@ export function createMockApi(opts: MockOptions = {}): ApiClient {
       return clone(c);
     },
 
+    async getImageObjectUrl(url) {
+      // Mock RenderImage.url values are already data: URIs produced by
+      // uploadImage's readFileAsDataUrl — there is no network fetch to
+      // perform and no Authorization header to attach, so this just hands
+      // the url back unchanged. (Not a stub: this is the complete,
+      // correct mock behavior, matching how an <img src="data:..."> would
+      // already render it without this method existing at all.)
+      await wait();
+      return url;
+    },
     async getGuestRoom(token) {
       await wait();
       const db = load();

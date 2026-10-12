@@ -87,3 +87,41 @@ to the backend's base URL to select the HTTP client. This matches the root
   generated — do not edit it by hand.
 - Styling is Tailwind CSS v4 + shadcn/ui (`src/components/ui/`), with Inter
   loaded from Google Fonts in `src/routes/__root.tsx`.
+
+## Known dev-server noise
+
+While running `npm run dev`, a hard reload or navigation away mid-load can
+print a trace like:
+
+```
+Error: aborted
+    at abortIncoming (node:_http_server:845:17)
+    at socketOnClose (node:_http_server:839:3)
+    at Socket.emit (node:events:520:35)
+    at TCP.<anonymous> (node:net:346:12) (status 500)
+```
+
+(Reproduced directly: aborting an in-flight request to the dev server —
+e.g. a client closing the connection before the response finishes — prints
+exactly this, with no application code anywhere in the stack. It still
+happens after the studio/guest image-rendering fixes in this issue, so it
+was never caused by the `401`/broken-image bug — it is an inherent
+property of Node's own HTTP server reacting to a client-closed socket.)
+
+This comes from Node's own `http.Server` (`node:_http_server`), one layer
+below TanStack Start's dev middleware and below `src/server.ts`'s own
+try/catch — it fires when the client's TCP socket closes while the server
+is still writing a response, which `server.ts`'s wrapper has no way to
+intercept (it isn't a thrown error reaching its `fetch()` call). We looked
+for a supported way to suppress specifically this trace — the
+`@lovable.dev/vite-tanstack-config` wrapper's own option surface
+(`vite`, `tanstackStart`, `serverFnErrorLogger`, `ssrErrorLogger`, `nitro`,
+…), Vite's dev-server options (`clientError` handling is for malformed
+*incoming* requests, not a response aborted mid-write), and Nitro/h3 (which
+only runs at build time for this app's `spa: { enabled: true }` setup —
+`npm run dev` serves requests through Vite's own dev middleware, not a
+built Nitro server) — and found no config knob that targets it. It is safe
+to ignore: it is purely a dev-server console artifact of the client
+disconnecting, not a real server error, and a genuine thrown `500` still
+logs normally (`server.ts`'s wrapper still catches and renders its error
+page for those).

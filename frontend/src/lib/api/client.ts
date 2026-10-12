@@ -19,6 +19,7 @@ import type {
  */
 export interface ApiClient {
   // ---- Studio auth ----
+  signup(email: string, password: string): Promise<Session>;
   login(email: string, password: string): Promise<Session>;
   logout(): Promise<void>;
   getCurrentUser(): Promise<StudioUser | null>;

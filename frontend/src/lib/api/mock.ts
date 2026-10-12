@@ -144,6 +144,27 @@ export function createMockApi(opts: MockOptions = {}): ApiClient {
   }
 
   return {
+    async signup(email, password) {
+      await wait();
+      const db = load();
+      const trimmedEmail = email.trim();
+      if (!/^\S+@\S+\.\S+$/.test(trimmedEmail)) throw new ApiError(400, "A valid email is required");
+      if (!password) throw new ApiError(400, "Password is required");
+      if (db.users.some((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase()))
+        throw new ApiError(409, "An account with this email already exists");
+      const user: StudioUser & { password: string } = {
+        id: uid("u"),
+        email: trimmedEmail,
+        name: trimmedEmail.split("@")[0] ?? trimmedEmail,
+        password,
+      };
+      db.users.push(user);
+      const token = uid("t");
+      db.sessions[token] = user.id;
+      save(db);
+      storage().setItem(SESSION_KEY, token);
+      return { token, user: { id: user.id, email: user.email, name: user.name } };
+    },
     async login(email, password) {
       await wait();
       const db = load();
@@ -319,6 +340,9 @@ export function createMockApi(opts: MockOptions = {}): ApiClient {
       if (ctx.room.id !== room.id) throw new ApiError(404, "Pin not found");
       if (!authorName.trim()) throw new ApiError(400, "Name is required");
       const c = addComment(db, pinId, text, authorName.trim(), "client");
+      // A guest reply reopens a pin the studio resolved (fix/question only —
+      // like pins have no status and never reach this branch).
+      if (ctx.pin.status === "resolved") ctx.pin.status = "open";
       save(db);
       return clone(c);
     },

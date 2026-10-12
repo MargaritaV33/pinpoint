@@ -34,6 +34,11 @@ export function createHttpApi(baseUrl: string): ApiClient {
   const enc = encodeURIComponent;
 
   return {
+    async signup(email, password) {
+      const s = await req<Awaited<ReturnType<ApiClient["signup"]>>>("POST", "/auth/signup", { email, password });
+      localStorage.setItem(TOKEN_KEY, s.token);
+      return s;
+    },
     async login(email, password) {
       const s = await req<Awaited<ReturnType<ApiClient["login"]>>>("POST", "/auth/login", { email, password });
       localStorage.setItem(TOKEN_KEY, s.token);

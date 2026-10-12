@@ -30,6 +30,26 @@ describe("mock api: auth", () => {
   });
 });
 
+describe("mock api: signup", () => {
+  it("rejects an email already registered", async () => {
+    await expect(api.signup(DEMO_EMAIL, "whatever")).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("rejects a blank/invalid email or a blank password", async () => {
+    await expect(api.signup("", "pw")).rejects.toMatchObject({ status: 400 });
+    await expect(api.signup("not-an-email", "pw")).rejects.toMatchObject({ status: 400 });
+    await expect(api.signup("new@studio.test", "")).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("creates a new studio user, logs them in, and persists the session", async () => {
+    const s = await api.signup("new@studio.test", "secret123");
+    expect(s.user.email).toBe("new@studio.test");
+    expect(s.user.name).toBe("new");
+    expect(s.token).toBeTruthy();
+    expect(await api.getCurrentUser()).toMatchObject({ email: "new@studio.test", name: "new" });
+  });
+});
+
 describe("mock api: rooms", () => {
   it("lists seeded rooms with open pin counts", async () => {
     await login();
@@ -107,6 +127,22 @@ describe("mock api: pins and threads", () => {
     await api.closeRoom("r_lakeside");
     await expect(api.addGuestComment("lakeside-demo", "p1", "hi", "M")).rejects.toMatchObject({ status: 403 });
     await expect(api.approveRound("lakeside-demo", "M")).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("reopens a resolved fix pin when a guest replies to it", async () => {
+    await login();
+    expect((await api.setPinStatus("p1", "resolved")).status).toBe("resolved");
+    await api.addGuestComment("lakeside-demo", "p1", "Any update on this?", "Marta");
+    const { pins } = await api.getGuestRoom("lakeside-demo");
+    expect(pins.find((p) => p.id === "p1")!.status).toBe("open");
+  });
+
+  it("does not reopen a pin when the studio itself replies", async () => {
+    await login();
+    await api.setPinStatus("p1", "resolved");
+    await api.addStudioComment("p1", "Still looking into it.");
+    const { pins } = await api.getRoom("r_lakeside");
+    expect(pins.find((p) => p.id === "p1")!.status).toBe("resolved");
   });
 
   it("persists across client instances sharing storage", async () => {

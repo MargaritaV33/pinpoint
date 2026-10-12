@@ -222,3 +222,57 @@ verified. Consolidated into a narrative before submission.
   test-scenario steps 1–7 (curl-verified vs. needs-human-browser-check) is
   recorded on the issue. Orchestrator reverted the stray generated-file
   diff, closed issue #5, and pushed all 5 commits to `main`.
+
+## 2026-10-12 — Issue #16: Human browser QA after #5 (sign-up, image rendering, dev-server noise)
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`. Issue created from the owner's own manual
+  Chrome walkthrough of `_docs/test-scenario.md` against the real backend.
+- **PM input/output:** root-caused as much as possible from reading code
+  alone before handing off. For the studio 401, confirmed with certainty
+  that a bare `<img src>` can't send a bearer header, and chose
+  authenticated-fetch-to-object-URL over a signed query token specifically
+  because a signed token would break the stable cache key issue #4's
+  `ETag`/`Cache-Control` headers rely on. For the stranger "guest returns
+  200 but still shows broken" report, ruled out three hypotheses by reading
+  code (no conditional-GET/304 logic exists at all; the URL-rewrite already
+  covers guest rooms and is tested; the seed JPEGs are real valid files),
+  then — rather than guessing past that point — left a priority-ordered
+  list of what to check live, explicitly flagging that reading alone
+  couldn't settle it.
+- **Engineer input/output:** implemented the sign-up mode toggle (extracted
+  to a testable pure function, since this repo's jsdom setup can't render
+  full routes), the contract-first prose update, and the studio
+  object-URL fix with a new `useImageSrc` hook (the one deliberate,
+  issue-sanctioned exception to issue #5's "don't touch components" rule).
+  For the guest investigation, worked through the PM's priority list rather
+  than assuming: found the guest endpoint itself was fine on every live
+  check, and landed on a plausible explanation (a dev server started before
+  `.env` existed would have silently served `MockApiClient`) that it
+  couldn't fully re-prove after the fact — so, per the issue's own
+  instruction for exactly this case, applied the documented fallback
+  (routing guest images through the same mechanism as studio) rather than
+  declaring the bug fixed without evidence. Reproduced the dev-server abort
+  trace live, confirmed no supported suppression config exists, and
+  documented it in `frontend/README.md` instead.
+- **Review:** QA treated the investigation as the highest-scrutiny part of
+  the review — independently re-ran the engineer's own verification method
+  for the stale-dev-server theory, confirmed via diff (not the PR
+  description) that guest images really do use the fallback mechanism and
+  that the guest endpoint's contract is genuinely unchanged, and curled
+  both image endpoints itself for seeded and freshly-uploaded JPG/PNG
+  files. Found and reported one minor, real, unflagged issue (an in-flight
+  object-URL fetch that resolves after cancellation is never revoked) —
+  judged non-blocking rather than a FAIL, and left unfixed per its own
+  "report, don't fix" mandate.
+- **Verification:** `make test` → 73 passed (backend); `make
+  frontend-test` → 48 passed across 6 files (frontend, mock still
+  selectable); `npm run build` succeeds; live curl checks against the real
+  backend for 401-without-token/200-with-token (studio) and 200
+  (guest, seeded + fresh uploads). QA verdict: PASS, with the required
+  verified-vs-needs-human-browser-check breakdown recorded on the issue
+  (visual image rendering, the resize-keeps-pin-positioned check, and the
+  sign-up form's appearance all still need a human browser pass).
+  Orchestrator closed issue #16 and pushed all 5 commits (2 of them the
+  repo owner's own direct `.gitattributes`/decisions.md commits, made
+  outside this session) to `main`.

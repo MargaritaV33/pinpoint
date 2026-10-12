@@ -169,3 +169,56 @@ verified. Consolidated into a narrative before submission.
   data, auth, ownership, and every listed business rule. QA verdict: PASS
   on all 6 acceptance-criteria sections. Orchestrator closed issue #4 and
   pushed `220f89a` to `main`.
+
+## 2026-10-12 — Issue #5: Connect frontend and backend
+
+- **Tool:** Claude Code, orchestrator + PM + two engineer passes + two QA
+  passes (a real FAIL/fix/re-verify loop per `_docs/process.md` step 5),
+  each a fresh session.
+- **PM input/output:** read `openapi.yaml`, `http.ts`, the backend's CORS
+  config, and issue #4's grooming history before writing criteria. Found,
+  by reading code rather than assuming, that Vite doesn't load a root-level
+  `.env` by default and that `<img src>` needs an absolute URL the backend's
+  relative `RenderImage.url` doesn't provide. Made a deliberate, justified
+  call to document a two-terminal recipe in the README instead of adding a
+  `make dev` target, to avoid cross-platform process-lifecycle risk. Made
+  "which test-scenario steps need a human browser check" an explicit,
+  required part of QA's output for this issue, since no browser automation
+  tool is available to these agents.
+- **Engineer input/output (pass 1):** fixed Vite's `envDir`, rewrote
+  relative image URLs to absolute inside `http.ts` only (left UI components
+  untouched), added the `approveRound` 404 doc fix to `openapi.yaml`
+  (backend already behaved correctly — documentation-only), added 401
+  token-clearing, wrote `http.test.ts` for request shaping, and ran a full
+  curl-based walkthrough of test-scenario steps 1–7 against the real
+  backend. Surfaced, but did not unilaterally fix (correctly flagged
+  instead), a real finding outside what the issue text assumed: the actual
+  `npm run dev` port is 8080 (from the Lovable config wrapper), not Vite's
+  assumed default 5173, and `CORS_ORIGINS`'s default didn't cover it.
+- **Review (QA pass 1): FAIL.** QA followed up on the engineer's flagged
+  finding instead of treating it as a nitpick — confirmed live that the
+  real dev server's actual origin was CORS-blocked by default, which
+  defeats this issue's literal goal (frontend talks to backend) regardless
+  of which port number the issue text happened to assume. Correctly
+  distinguished "the issue text's example was wrong" from "the underlying
+  acceptance criterion is satisfied," and failed on the latter.
+- **Engineer input/output (pass 2):** chose to pin the dev server to
+  `5173` with `strictPort: true` in `vite.config.ts` (fail loudly on
+  conflict) rather than chase the wrapper's non-deterministic port
+  fallback with a `CORS_ORIGINS` change, reasoning that a stable pinned
+  port keeps every existing doc/config correct with one small change.
+  Verified live against the real backend.
+- **Review (QA pass 2): PASS.** Re-verified the entire issue fresh (not
+  just the fix) — restarted the dev server from a clean port, confirmed
+  `strictPort` actually fails loudly on conflict rather than silently
+  drifting, re-ran the full curl walkthrough with fresh data, and reverted
+  an incidental line-ending-only diff on a generated file (`routeTree.gen.ts`)
+  twice to keep the tree clean.
+- **Verification:** backend `pytest` 73 passed (both QA passes); frontend
+  `vitest` 39 passed across 5 files with no `.env`/backend running (mock
+  regression guard holds); `npm run build` succeeds; live CORS curl check
+  against the real, pinned port returns 200 with the correct
+  `Access-Control-Allow-Origin`. QA's required step-by-step breakdown of
+  test-scenario steps 1–7 (curl-verified vs. needs-human-browser-check) is
+  recorded on the issue. Orchestrator reverted the stray generated-file
+  diff, closed issue #5, and pushed all 5 commits to `main`.

@@ -24,5 +24,15 @@ export default defineConfig({
   // root so `npm run dev`/`npm run build` here pick up a root-level .env.
   vite: {
     envDir: "../",
+    // The wrapper's own non-sandbox default is server.port: 8080, with a
+    // fallback to 8081/8082 etc. if busy — non-deterministic across
+    // machines/runs, and not what .env.example's CORS_ORIGINS default or
+    // README.md assume. Pin the dev server to Vite's documented default,
+    // 5173, and fail loudly (strictPort) instead of silently drifting to
+    // another port, so CORS_ORIGINS's default origin stays correct.
+    server: {
+      port: 5173,
+      strictPort: true,
+    },
   },
 });

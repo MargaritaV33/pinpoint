@@ -1,0 +1,1035 @@
+openapi: 3.0.3
+info:
+  title: Pinpoint API
+  version: "1.0.0"
+  description: >
+    Client feedback on archviz renders: studios create rooms, upload renders,
+    and share a guest link; clients drop pins on images and comment on them
+    without an account. This document is the contract — the backend (#4) is
+    implemented against it, and the frontend's single API client
+    (`frontend/src/lib/api/`) has both a mock and an HTTP implementation of
+    it.
+  license:
+    name: Proprietary
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local backend (uvicorn, `make run`)
+  - url: /
+    description: Same-origin (Docker Compose / production, served by the backend)
+
+tags:
+  - name: Studio auth
+    description: Bearer-token session for the studio side.
+  - name: Studio rooms
+    description: Rooms owned by the signed-in studio user.
+  - name: Studio images
+    description: Uploading and managing render images within a room.
+  - name: Studio pins
+    description: Resolving pins and replying to them as the studio.
+  - name: Guest
+    description: >
+      The client side. No account — a display name plus the room's guest
+      token, carried as a path segment, never a header or query parameter.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/signup:
+    post:
+      operationId: signup
+      summary: Create a studio account and sign in
+      description: >
+        Creates a new studio user and immediately starts a session for it,
+        the same way `/auth/login` does. No authentication required.
+      tags: [Studio auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "201":
+          description: Account created and signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: The email is blank or not a valid address, or the password is blank.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: An account with this email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: Sign in to a studio account
+      description: Starts a session for an existing studio user. No authentication required.
+      tags: [Studio auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          description: The email or password is incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: End the current studio session
+      description: Invalidates the bearer token used to call it. No request body.
+      tags: [Studio auth]
+      responses:
+        "204":
+          description: Session ended. No content.
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: Get the signed-in studio user
+      description: >
+        Returns the studio user for the bearer token on the request. The
+        frontend's `getCurrentUser()` treats any failure here (missing or
+        invalid token) as "not signed in" and returns `null` rather than
+        throwing.
+      tags: [Studio auth]
+      responses:
+        "200":
+          description: The signed-in studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudioUser"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /rooms:
+    get:
+      operationId: listRooms
+      summary: List the signed-in studio's rooms
+      description: Rooms owned by the caller, each with its current open-pin count.
+      tags: [Studio rooms]
+      responses:
+        "200":
+          description: The caller's rooms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoomSummary"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createRoom
+      summary: Create a room
+      description: Creates a room owned by the caller, with a fresh guest token.
+      tags: [Studio rooms]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomInput"
+      responses:
+        "201":
+          description: The created room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+        "400":
+          description: "`title` or `clientName` is blank."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /rooms/{roomId}:
+    get:
+      operationId: getRoom
+      summary: Get a room with its images and pins
+      description: >
+        The only way images and pins are listed for the studio — there is no
+        separate "list images" or "list pins" endpoint; both come embedded
+        in the returned `RoomDetail`.
+      tags: [Studio rooms]
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      responses:
+        "200":
+          description: The room, its images, and its pins (each with its comments).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomDetail"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such room, or it belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /rooms/{roomId}/close:
+    post:
+      operationId: closeRoom
+      summary: Close a room
+      description: Closes the room. Closed rooms reject further writes from either side.
+      tags: [Studio rooms]
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      responses:
+        "200":
+          description: The closed room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such room, or it belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /rooms/{roomId}/export:
+    get:
+      operationId: exportOpenPins
+      summary: Export the room's open pins as plain text
+      description: >
+        The plain-text list of currently open pins, grouped by image.
+        Resolved pins and `like` pins are excluded. The response is
+        `text/plain`, not JSON.
+      tags: [Studio rooms]
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      responses:
+        "200":
+          description: The formatted export text.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such room, or it belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /rooms/{roomId}/images:
+    post:
+      operationId: uploadImage
+      summary: Upload a render image to a room
+      description: >
+        Uploads one render as a multipart form: a `title` field and a binary
+        `file` field. JPG or PNG only, 15 MB maximum
+        (`validation.ts`'s `MAX_RENDER_BYTES` / `ALLOWED_RENDER_TYPES`).
+      tags: [Studio images]
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, file]
+              properties:
+                title:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+                  description: JPG or PNG, at most 15 MB.
+      responses:
+        "201":
+          description: The uploaded image's record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderImage"
+        "400":
+          description: "`title` is blank."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such room, or it belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: The file exceeds 15 MB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: The file's content type is not `image/jpeg` or `image/png`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /images/{imageId}:
+    patch:
+      operationId: setImageSuperseded
+      summary: Mark a render image as superseded (or not)
+      description: >
+        There is no versioning in v1 — a new render is a new image, and the
+        old one is flagged `superseded` here instead of being replaced.
+      tags: [Studio images]
+      parameters:
+        - $ref: "#/components/parameters/ImageId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetImageSupersededInput"
+      responses:
+        "200":
+          description: The updated image record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderImage"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The image's room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such image, or its room belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /rooms/{roomId}/images/{imageId}/file:
+    get:
+      operationId: getRoomImageFile
+      summary: Fetch a render's image bytes (studio)
+      description: >
+        Raw image bytes for a render, as the studio. There is no separate
+        upload/download path for the `RenderImage.url` field — `url` in the
+        JSON record is the path to this endpoint (or its guest-token
+        equivalent, `getGuestImageFile`, depending on which `RoomDetail` it
+        came from).
+      tags: [Studio images]
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+        - $ref: "#/components/parameters/ImageId"
+      responses:
+        "200":
+          description: >
+            The image's raw bytes, with `ETag` and `Cache-Control` headers so
+            the browser caches renders across polls instead of refetching the
+            bytes every time.
+          headers:
+            ETag:
+              description: Opaque identifier for this exact file version.
+              schema:
+                type: string
+            Cache-Control:
+              description: "e.g. `public, max-age=86400`."
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such image in this room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /guest/{guestToken}/images/{imageId}/file:
+    get:
+      operationId: getGuestImageFile
+      summary: Fetch a render's image bytes (guest)
+      description: >
+        Same bytes and headers as `getRoomImageFile`, scoped to the room
+        matching this guest token instead of to a studio session.
+      tags: [Guest]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GuestToken"
+        - $ref: "#/components/parameters/ImageId"
+      responses:
+        "200":
+          description: >
+            The image's raw bytes, with `ETag` and `Cache-Control` headers so
+            the browser caches renders across polls instead of refetching the
+            bytes every time.
+          headers:
+            ETag:
+              description: Opaque identifier for this exact file version.
+              schema:
+                type: string
+            Cache-Control:
+              description: "e.g. `public, max-age=86400`."
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: >
+            No such image, the guest token does not match any room, or the
+            image does not belong to that room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /pins/{pinId}:
+    patch:
+      operationId: setPinStatus
+      summary: Resolve or reopen a pin (studio)
+      description: Sets a `fix` or `question` pin's status. `like` pins have no status.
+      tags: [Studio pins]
+      parameters:
+        - $ref: "#/components/parameters/PinId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPinStatusInput"
+      responses:
+        "200":
+          description: The updated pin, with its comments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pin"
+        "400":
+          description: The pin's type is `like` — like pins have no status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The pin's room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such pin, or its room belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /pins/{pinId}/comments:
+    post:
+      operationId: addStudioComment
+      summary: Reply to a pin (studio)
+      description: >
+        Adds a studio reply to the pin's thread. Unlike a guest reply, this
+        never changes the pin's status — a studio reply does not reopen a
+        pin the studio itself resolved.
+      tags: [Studio pins]
+      parameters:
+        - $ref: "#/components/parameters/PinId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddStudioCommentInput"
+      responses:
+        "201":
+          description: The created comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: "`text` is blank."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: The bearer token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The pin's room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such pin, or its room belongs to a different studio user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /guest/{guestToken}:
+    get:
+      operationId: getGuestRoom
+      summary: Get a room by guest token, with its images and pins
+      description: >
+        The guest equivalent of `getRoom` — no account, just the token from
+        the room's share link. Images and pins come embedded in the returned
+        `RoomDetail`, same as the studio view.
+      tags: [Guest]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GuestToken"
+      responses:
+        "200":
+          description: The room, its images, and its pins (each with its comments).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomDetail"
+        "404":
+          description: The guest token does not match any room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /guest/{guestToken}/pins:
+    post:
+      operationId: createGuestPin
+      summary: Drop a new pin on an image (guest)
+      description: >
+        Creates a pin at a point on an image (`x`/`y` as a percent of the
+        image's width/height) with its first comment, under a display name
+        rather than an account.
+      tags: [Guest]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GuestToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePinInput"
+      responses:
+        "201":
+          description: The created pin, with its first comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pin"
+        "400":
+          description: >
+            `authorName` or `text` is blank, or `x`/`y` is not a finite
+            number in `[0, 100]`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "`imageId` does not belong to this room."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The image has been superseded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /guest/{guestToken}/pins/{pinId}/comments:
+    post:
+      operationId: addGuestComment
+      summary: Reply to a pin (guest)
+      description: >
+        Adds a guest reply to the pin's thread, under a display name.
+        Reopening rule: if the pin's current status is `resolved` and its
+        type is `fix` or `question`, adding this comment also sets the pin's
+        status back to `open` — a guest reopens a resolved pin simply by
+        replying to it (product spec client story 18). A studio reply
+        (`addStudioComment`) never does this.
+      tags: [Guest]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GuestToken"
+        - $ref: "#/components/parameters/PinId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddGuestCommentInput"
+      responses:
+        "201":
+          description: >
+            The created comment. If it reopened a resolved pin, the pin's
+            status is `open` in any subsequent fetch of it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: "`authorName` or `text` is blank."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: The pin does not belong to this room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /guest/{guestToken}/approve:
+    post:
+      operationId: approveRound
+      summary: Approve the round (guest)
+      description: >
+        Marks the room `approved`. A new `fix`/`question` pin created after
+        approval reopens the room back to `open` — that behavior lives in
+        `createGuestPin`/`createRoom` handling, not here, and is unchanged
+        by this contract.
+      tags: [Guest]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GuestToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveRoundInput"
+      responses:
+        "200":
+          description: The approved room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+        "403":
+          description: The room is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Studio session token, sent as `Authorization: Bearer <token>`.
+        Guest routes never use this scheme — the guest token is a path
+        segment instead (see the `GuestToken` parameter).
+
+  parameters:
+    RoomId:
+      name: roomId
+      in: path
+      required: true
+      description: A room's id.
+      schema:
+        type: string
+    ImageId:
+      name: imageId
+      in: path
+      required: true
+      description: A render image's id.
+      schema:
+        type: string
+    PinId:
+      name: pinId
+      in: path
+      required: true
+      description: A pin's id.
+      schema:
+        type: string
+    GuestToken:
+      name: guestToken
+      in: path
+      required: true
+      description: >
+        The room's guest token from its share link. Always a path segment —
+        never a header or query parameter.
+      schema:
+        type: string
+
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message.
+
+    StudioUser:
+      type: object
+      required: [id, email, name]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+
+    Session:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/StudioUser"
+
+    AuthCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    RoomStatus:
+      type: string
+      enum: [open, approved, closed]
+
+    Room:
+      type: object
+      required:
+        [id, title, clientName, createdAt, status, guestToken, approvedAt, approvedBy]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        clientName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/RoomStatus"
+        guestToken:
+          type: string
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        approvedBy:
+          type: string
+          nullable: true
+
+    RoomSummary:
+      allOf:
+        - $ref: "#/components/schemas/Room"
+        - type: object
+          required: [openPinCount]
+          properties:
+            openPinCount:
+              type: integer
+              description: Count of currently `open` pins across the room's images.
+
+    CreateRoomInput:
+      type: object
+      required: [title, clientName]
+      properties:
+        title:
+          type: string
+        clientName:
+          type: string
+
+    RenderImage:
+      type: object
+      required: [id, roomId, title, url, superseded, createdAt]
+      properties:
+        id:
+          type: string
+        roomId:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          description: >
+            The path to this image's bytes — `getRoomImageFile` or
+            `getGuestImageFile`, depending on which `RoomDetail` this record
+            came from. There is no other way to fetch or store the bytes.
+        superseded:
+          type: boolean
+          description: True once a newer render has replaced this one (no versioning in v1).
+        createdAt:
+          type: string
+          format: date-time
+
+    SetImageSupersededInput:
+      type: object
+      required: [superseded]
+      properties:
+        superseded:
+          type: boolean
+
+    PinType:
+      type: string
+      enum: [fix, question, like]
+
+    PinStatus:
+      type: string
+      enum: [open, resolved]
+      nullable: true
+      description: "`null` for `like` pins, which carry no status."
+
+    AuthorRole:
+      type: string
+      enum: [studio, client]
+
+    Comment:
+      type: object
+      required: [id, pinId, text, authorName, authorRole, createdAt]
+      properties:
+        id:
+          type: string
+        pinId:
+          type: string
+        text:
+          type: string
+        authorName:
+          type: string
+        authorRole:
+          $ref: "#/components/schemas/AuthorRole"
+        createdAt:
+          type: string
+          format: date-time
+
+    Pin:
+      type: object
+      required: [id, imageId, number, x, y, type, status, createdAt, comments]
+      properties:
+        id:
+          type: string
+        imageId:
+          type: string
+        number:
+          type: integer
+          description: Sequential per image, starting at 1.
+        x:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percent of image width.
+        y:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percent of image height.
+        type:
+          $ref: "#/components/schemas/PinType"
+        status:
+          $ref: "#/components/schemas/PinStatus"
+        createdAt:
+          type: string
+          format: date-time
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+
+    CreatePinInput:
+      type: object
+      required: [imageId, x, y, type, text, authorName]
+      properties:
+        imageId:
+          type: string
+        x:
+          type: number
+          minimum: 0
+          maximum: 100
+        y:
+          type: number
+          minimum: 0
+          maximum: 100
+        type:
+          $ref: "#/components/schemas/PinType"
+        text:
+          type: string
+        authorName:
+          type: string
+
+    SetPinStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [open, resolved]
+
+    AddStudioCommentInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+
+    AddGuestCommentInput:
+      type: object
+      required: [text, authorName]
+      properties:
+        text:
+          type: string
+        authorName:
+          type: string
+
+    ApproveRoundInput:
+      type: object
+      required: [authorName]
+      properties:
+        authorName:
+          type: string
+
+    RoomDetail:
+      type: object
+      required: [room, images, pins]
+      properties:
+        room:
+          $ref: "#/components/schemas/Room"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/RenderImage"
+        pins:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pin"

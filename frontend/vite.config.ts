@@ -18,4 +18,11 @@ export default defineConfig({
     // serves the built frontend, see AGENTS.md).
     spa: { enabled: true },
   },
+  // Vite only loads .env* files from its own project root (frontend/) by
+  // default, but VITE_API_BASE_URL is documented only in the repo-root
+  // .env.example (the repo keeps exactly one). Point envDir at the repo
+  // root so `npm run dev`/`npm run build` here pick up a root-level .env.
+  vite: {
+    envDir: "../",
+  },
 });

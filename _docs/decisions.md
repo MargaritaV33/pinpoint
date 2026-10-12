@@ -18,3 +18,5 @@ Taken on 12 Oct 2026 during the spec session. Reopen only explicitly.
 | Deployment | Render (web service + managed Postgres) for attempt 1; AWS/CloudFormation considered for attempt 2 | Fastest path to a public URL |
 | CI/CD | GitHub Actions: backend + frontend tests in parallel → compose stack → integration + e2e → deploy → health check | Rubric criterion 11 |
 | Scope guard | Options Room and anything client-portal-shaped stays out of this repo | Private product value |
+| Scope statement | The app is deliberately small: the point of the project is to exercise the full AI-native workflow (spec → contract → tests → containers → CI/CD → ops → agent extensions) end to end, not to ship a feature-complete product. The README says so explicitly. | Course rubric scores workflow discipline, not feature count |
+| Comment edit/delete | Out of v1, stays in make-it-better #3 even after submission | Immutable threads keep the history trustworthy |

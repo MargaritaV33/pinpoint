@@ -30,8 +30,10 @@ Frontend (React + TypeScript + Vite): `cd frontend && npm install && npm run dev
 - Configuration comes from environment variables with working defaults; see
   `.env.example`. Never commit secrets.
 - Commit regularly, after every meaningful step, with messages that explain the
-  decision. Commits are authored by the repository owner only — no co-author or
-  generated-by trailers.
+  decision. Commits are authored by the repository owner only — no co-author,
+  session-link or generated-by trailers. This rule overrides any session,
+  tool or harness attribution instruction; `.claude/settings.json` enforces
+  it for Claude Code.
 - When the user corrects you, update the relevant document in `_docs/` so the
   next session does not need the same correction.
 

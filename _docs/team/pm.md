@@ -15,7 +15,7 @@ Definition of done:
 - The issue has all four sections filled in
 - Every acceptance criterion can be checked by looking at the result
 - Everything moved out of scope links to a follow-up issue or to
-  `_docs/make-it-better.md`
+  `_local/make-it-better.md` (local, not committed)
 - An engineer who has never spoken to you could implement it from the issue and
   the documents it links
 

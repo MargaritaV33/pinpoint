@@ -45,6 +45,6 @@ Frontend (React + TypeScript + Vite): `cd frontend && npm install && npm run dev
 - `_docs/team/` — role definitions for PM, software engineer, QA engineer
 - `_docs/decisions.md` — decisions already taken; do not reopen them silently
 - `_docs/test-scenario.md` — the manual end-to-end scenario
-- `_docs/make-it-better.md` — ideas parked for after the MVP
+- `_local/make-it-better.md` — ideas parked for after the MVP (local only, not committed)
 - `docs/` — user-facing documentation (architecture, testing, deployment,
   AI usage report)

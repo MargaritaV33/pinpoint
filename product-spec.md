@@ -115,4 +115,4 @@ when the next round arrives. Both sides waste time reconstructing what was asked
 - Billing, white-label, multi-studio tenancy
 - File storage outside the database (S3 etc.)
 
-Ideas that were cut or came up later live in `_docs/make-it-better.md`.
+Ideas that were cut or came up later live in `_local/make-it-better.md` (local, not committed).

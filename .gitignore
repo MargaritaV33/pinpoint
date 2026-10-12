@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.db
+*.sqlite3
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+playwright-report/
+test-results/
+
+# Env & editors
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+
+# Local-only notes (plan HTML etc.)
+_local/

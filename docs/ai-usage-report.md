@@ -125,3 +125,47 @@ verified. Consolidated into a narrative before submission.
   confirmed by QA's own fresh run); `npx tsc --noEmit` in `frontend/` →
   clean. QA verdict: PASS on all 9 acceptance-criteria sections. Orchestrator
   closed issue #3 and pushed `16b9cdb`, `5ccfd39` to `main`.
+
+## 2026-10-12 — Issue #4: Backend from the contract with an in-memory store
+
+- **Tool:** Claude Code, orchestrator + three subagents (PM, Engineer, QA),
+  each a fresh session per `_docs/process.md`.
+- **PM input/output:** turned the owner's rules into checkable criteria by
+  reading `openapi.yaml`, `mock-seed.ts`, `mock.ts`, and `validation.ts`
+  first. Made explicit design decisions the backlog left implicit: `Store`
+  as an `abc.ABC` (not `Protocol`) so issue #6's SQLAlchemy store fails
+  loudly if it misses a method; seed data in `backend/app/seed.py` as
+  storage-agnostic plain data so #6 can reuse it; a server-side session
+  record alongside the JWT so logout actually revokes a token. Resolved a
+  real disagreement between the contract (413/415 on upload) and the
+  frontend mock (400 for both) in the contract's favor, per the owner's
+  instruction to check `openapi.yaml`, not guess. Found and flagged — but
+  explicitly left unfixed, per the issue's own constraint — a gap in
+  `openapi.yaml` itself: `approveRound` doesn't document a `404` response
+  for an unknown guest token, unlike every other guest endpoint.
+- **Engineer input/output:** built the full backend — six routers, Pydantic
+  schemas for every contract type, the `Store` ABC + `InMemoryStore`, seed
+  data matching the frontend mock's demo accounts/rooms exactly, JWT +
+  bcrypt auth with session revocation, and every business rule (sequential
+  pin numbering, reopen-on-guest-reply, approve-reopens-on-new-pin,
+  closed-room 403s, upload 413/415, ETag/Cache-Control on image bytes,
+  text/plain export). Hit and documented one real-world dependency
+  conflict: bcrypt 5.0 broke passlib 1.7.4's import-time self-test, fixed
+  with a `bcrypt<4.1` pin, reported rather than silently patched around.
+  Wrote 73 tests including named cases for every business rule and a
+  dedicated contract-coverage test.
+- **Review:** QA re-ran the full test suite independently (73/73, twice, via
+  two different invocation paths), ran the live server and curl'd every
+  auth/ownership/business-rule claim itself rather than trusting the
+  engineer's report (cross-owner 404s, cross-room guest-token 404s, logout
+  revocation, the approveRound 404 gap, every closed-room rejection),
+  grepped for stray `InMemoryStore` imports to confirm the interface
+  boundary actually holds, and checked the installed dependency versions
+  against the engineer's stated justification for the bcrypt pin.
+- **Verification:** `make test` → 73 passed, 0 failed (engineer and QA, run
+  independently); `test_openapi_contract.py` confirmed to actually diff
+  `openapi.yaml`'s (path, method) pairs against `app.openapi()`; `make run`
+  + `GET /health` → 200; live curls against the running server for seed
+  data, auth, ownership, and every listed business rule. QA verdict: PASS
+  on all 6 acceptance-criteria sections. Orchestrator closed issue #4 and
+  pushed `220f89a` to `main`.

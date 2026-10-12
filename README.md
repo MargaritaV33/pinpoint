@@ -12,3 +12,14 @@ Final project for the [AI Dev Tools Zoomcamp 2026](https://github.com/DataTalksC
 - How AI tools were used: [`docs/ai-usage-report.md`](docs/ai-usage-report.md)
 
 Status: specification and backlog. Code arrives issue by issue.
+
+## Getting started
+
+- `make sync` — install backend dependencies (`uv sync`)
+- `make run` — start the backend with auto-reload
+- `make test` — run the backend test suite
+- `make frontend-test` — install frontend dependencies and run the frontend
+  test suite (also runnable directly via `cd frontend && npm install`)
+
+`make up` and `make down` are not functional yet — they print a pointer to
+issue #8 and exit non-zero until the Docker Compose stack exists.

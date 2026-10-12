@@ -56,19 +56,22 @@ when the next round arrives. Both sides waste time reconstructing what was asked
 10. I can export the open pins of a room as a plain list (text/Markdown) grouped
     by image, to paste into a task tracker.
 11. I can close a room; a closed room is read-only for the client.
+12. I can filter the pins of an image: all / open / fix / question / like.
+13. I see, on the image switcher, how many open pins each image has.
 
 ### Client
 
-12. As a client I can open the guest link without an account and enter a display
+14. As a client I can open the guest link without an account and enter a display
     name once.
-13. I can switch between the images of the room.
-14. I can click a point on an image to create a pin, choose its type, and write
+15. I can switch between the images of the room.
+16. I can click a point on an image to create a pin, choose its type, and write
     the first comment.
-15. I can reply in any thread.
-16. I can see a pin's status and reopen a resolved pin by replying to it.
-17. I can press **Approve round** when everything is fine; the room becomes
-    `approved` and the studio sees it.
-18. I see new pins and replies without a full page reload (light polling).
+17. I can reply in any thread.
+18. I can see a pin's status and reopen a resolved pin by replying to it.
+19. I can press **Approve round** when everything is fine; the room becomes
+    `approved` and the studio sees it. If a client adds a new `fix` or
+    `question` pin afterwards, the room goes back to `open`.
+20. I see new pins and replies without a full page reload (light polling).
 
 ## Acceptance criteria (MVP)
 
@@ -79,6 +82,7 @@ when the next round arrives. Both sides waste time reconstructing what was asked
 - Client cannot resolve pins, close rooms, upload or supersede images.
 - Studio cannot act on rooms that are not theirs; a guest token only opens its
   own room.
+- The pin filter and the per-image open-pin count agree with the pin list.
 - A closed room rejects new pins and comments from the client with a visible
   message.
 - Upload rejects files that are not JPG/PNG or exceed 15 MB with a clear error.

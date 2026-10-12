@@ -1,7 +1,22 @@
 import type { ApiClient } from "./client";
-import { ApiError } from "./types";
+import { ApiError, type RenderImage, type RoomDetail } from "./types";
 
 const TOKEN_KEY = "pinpoint.token";
+
+/**
+ * The backend documents `RenderImage.url` as "the path to this image's
+ * bytes" and returns it as a path relative to the backend's own origin
+ * (e.g. `/rooms/{roomId}/images/{imageId}/file`), not the frontend's. An
+ * `<img src>` resolves a relative URL against the *page's* origin, so it
+ * must be rewritten to an absolute URL against this client's `baseUrl`.
+ */
+function withAbsoluteImageUrl(baseUrl: string, image: RenderImage): RenderImage {
+  return image.url.startsWith("/") ? { ...image, url: `${baseUrl}${image.url}` } : image;
+}
+
+function withAbsoluteImageUrls(baseUrl: string, detail: RoomDetail): RoomDetail {
+  return { ...detail, images: detail.images.map((image) => withAbsoluteImageUrl(baseUrl, image)) };
+}
 
 /** Real implementation against the future FastAPI service. */
 export function createHttpApi(baseUrl: string): ApiClient {
@@ -19,6 +34,7 @@ export function createHttpApi(baseUrl: string): ApiClient {
     }
     const res = await fetch(`${baseUrl}${path}`, { method, headers, body: payload });
     if (!res.ok) {
+      if (res.status === 401 && typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY);
       let msg = res.statusText;
       try {
         msg = (await res.json()).detail ?? msg;
@@ -61,19 +77,20 @@ export function createHttpApi(baseUrl: string): ApiClient {
     },
     listRooms: () => req("GET", "/rooms"),
     createRoom: (input) => req("POST", "/rooms", input),
-    getRoom: (id) => req("GET", `/rooms/${enc(id)}`),
+    getRoom: async (id) => withAbsoluteImageUrls(baseUrl, await req<RoomDetail>("GET", `/rooms/${enc(id)}`)),
     closeRoom: (id) => req("POST", `/rooms/${enc(id)}/close`),
     exportOpenPins: (id) => req("GET", `/rooms/${enc(id)}/export`),
-    uploadImage: (roomId, { title, file }) => {
+    uploadImage: async (roomId, { title, file }) => {
       const fd = new FormData();
       fd.append("title", title);
       fd.append("file", file);
-      return req("POST", `/rooms/${enc(roomId)}/images`, fd);
+      return withAbsoluteImageUrl(baseUrl, await req<RenderImage>("POST", `/rooms/${enc(roomId)}/images`, fd));
     },
-    setImageSuperseded: (id, superseded) => req("PATCH", `/images/${enc(id)}`, { superseded }),
+    setImageSuperseded: async (id, superseded) =>
+      withAbsoluteImageUrl(baseUrl, await req<RenderImage>("PATCH", `/images/${enc(id)}`, { superseded })),
     setPinStatus: (id, status) => req("PATCH", `/pins/${enc(id)}`, { status }),
     addStudioComment: (pinId, text) => req("POST", `/pins/${enc(pinId)}/comments`, { text }),
-    getGuestRoom: (t) => req("GET", `/guest/${enc(t)}`),
+    getGuestRoom: async (t) => withAbsoluteImageUrls(baseUrl, await req<RoomDetail>("GET", `/guest/${enc(t)}`)),
     createGuestPin: (t, input) => req("POST", `/guest/${enc(t)}/pins`, input),
     addGuestComment: (t, pinId, text, authorName) =>
       req("POST", `/guest/${enc(t)}/pins/${enc(pinId)}/comments`, { text, authorName }),

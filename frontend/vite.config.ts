@@ -11,5 +11,11 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // defaultSsr: false (src/start.ts) makes this a client-only SPA; `spa.enabled`
+    // makes `npm run build` prerender one static shell (index.html) that is served
+    // for every path, so the build output needs no server process to run — it can
+    // be served as plain static files (matches this repo's deployment: FastAPI
+    // serves the built frontend, see AGENTS.md).
+    spa: { enabled: true },
   },
 });

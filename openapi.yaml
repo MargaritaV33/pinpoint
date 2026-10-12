@@ -399,7 +399,12 @@ paths:
         upload/download path for the `RenderImage.url` field — `url` in the
         JSON record is the path to this endpoint (or its guest-token
         equivalent, `getGuestImageFile`, depending on which `RoomDetail` it
-        came from).
+        came from). This endpoint requires a bearer token (see the `401`
+        response below), so it is not meant to be used as a bare
+        `<img src>` — a plain `<img>` tag has no way to attach an
+        `Authorization` header. Callers must `fetch` this URL with the same
+        bearer token used for every other studio call and render the
+        response body (e.g. via `URL.createObjectURL`).
       tags: [Studio images]
       parameters:
         - $ref: "#/components/parameters/RoomId"
@@ -447,7 +452,10 @@ paths:
       summary: Fetch a render's image bytes (guest)
       description: >
         Same bytes and headers as `getRoomImageFile`, scoped to the room
-        matching this guest token instead of to a studio session.
+        matching this guest token instead of to a studio session. Unlike
+        `getRoomImageFile`, this endpoint needs no authentication
+        (`security: []`), so callers may use this URL directly as a plain
+        `<img src>`.
       tags: [Guest]
       security: []
       parameters:
@@ -894,6 +902,11 @@ components:
             The path to this image's bytes — `getRoomImageFile` or
             `getGuestImageFile`, depending on which `RoomDetail` this record
             came from. There is no other way to fetch or store the bytes.
+            `getRoomImageFile` (studio) requires the `Authorization` header,
+            so callers must fetch this URL with that header and render the
+            response body themselves (e.g. via `URL.createObjectURL`) — a
+            bare `<img src>` cannot attach it. `getGuestImageFile` (guest)
+            needs no authentication and may be used directly as `<img src>`.
         superseded:
           type: boolean
           description: True once a newer render has replaced this one (no versioning in v1).

@@ -86,3 +86,42 @@ verified. Consolidated into a narrative before submission.
   automation available in-session); step 8 correctly skipped (no backend
   yet). QA verdict: PASS on all 18 acceptance criteria. Orchestrator closed
   issue #2 and pushed the seven import/cleanup commits to `main`.
+
+## 2026-10-12 — Issue #3: OpenAPI contract
+
+- **Tool:** Claude Code, orchestrator + three subagents (PM, Engineer, QA),
+  each a fresh session per `_docs/process.md`.
+- **PM input/output:** derived the contract's scope directly from
+  `frontend/src/lib/api/{client.ts,types.ts,validation.ts,mock.ts,http.ts}`
+  rather than the one-line backlog description. Verified the original
+  issue text's claim that `client.ts` had a `signup` method was wrong (it
+  didn't — `login`/`logout`/`getCurrentUser` only) and made adding it an
+  acceptance criterion. Locked in conventions already implicit in the code
+  (bearer header for studio, `guestToken` as a path segment for guest
+  routes) rather than inventing new ones. Corrected a second misconception
+  in the original text: there are no separate list-images/list-pins
+  endpoints — both are embedded in `RoomDetail` — and explicitly forbade
+  adding them. Required `npx @redocly/cli lint` as a mechanical,
+  QA-checkable pass/fail gate instead of a visual YAML read.
+- **Engineer input/output:** wrote `openapi.yaml` (19 operations, OpenAPI
+  3.0.3) covering studio auth (incl. new `signup`), rooms, images (multipart
+  upload with 413/415, byte-serving with ETag/Cache-Control), pins/comments,
+  guest access, and the `text/plain` export. Added `signup(email, password)`
+  to `client.ts`/`mock.ts`/`http.ts` with 400/409 handling. Fixed the
+  reopen-on-reply gap flagged during issue #2: `mock.ts`'s
+  `addGuestComment` now reopens a resolved `fix`/`question` pin after a
+  guest's reply (`addStudioComment` deliberately left unaffected), and the
+  rule is spelled out in words in the `openapi.yaml` endpoint description,
+  not left as a silent side effect. Added matching test cases.
+- **Review:** QA read all ~1000 lines of `openapi.yaml` against every
+  acceptance-criteria section rather than sampling, confirmed the reopen
+  rule's wording actually appears in the endpoint description (not just
+  implied), spot-checked `http.ts` against the contract for drift, and
+  diffed the full changeset to confirm no file outside the issue's allowed
+  list was touched.
+- **Verification:** `npx @redocly/cli lint openapi.yaml` → 0 errors (1
+  harmless missing-license-URL warning, run independently by both engineer
+  and QA); `make frontend-test` → 4 files, 31 tests passing (up from 26,
+  confirmed by QA's own fresh run); `npx tsc --noEmit` in `frontend/` →
+  clean. QA verdict: PASS on all 9 acceptance-criteria sections. Orchestrator
+  closed issue #3 and pushed `16b9cdb`, `5ccfd39` to `main`.

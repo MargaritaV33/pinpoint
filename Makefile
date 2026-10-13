@@ -1,4 +1,4 @@
-.PHONY: sync run test frontend-test up down integration
+.PHONY: sync run test frontend-test up down integration e2e
 
 sync:
 	cd backend && uv sync
@@ -24,3 +24,10 @@ down:
 # only once, after every independent scenario has already passed.
 integration:
 	cd integration && uv sync && uv run pytest tests/ --ignore=tests/test_persistence.py && uv run pytest tests/test_persistence.py
+
+# Installs Chromium if needed, starts the Compose stack only if it isn't
+# already running, runs the Playwright suite against it, and leaves the
+# stack exactly as it found it. See e2e/scripts/run.mjs and
+# docs/testing.md for the full detection/teardown contract.
+e2e:
+	cd e2e && npm install && node scripts/run.mjs

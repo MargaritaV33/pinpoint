@@ -70,7 +70,44 @@ than hanging.
 
 ## End-to-end
 
-**Not built yet — coming in a follow-up issue (#10).** Playwright tests
-against the Compose stack, covering the same user-facing flows as
-`_docs/test-scenario.md` but through a real browser instead of direct
-HTTP. `make e2e` is reserved for this; it does not exist yet.
+A separate Node/TypeScript project (`e2e/`), using `@playwright/test`,
+that drives a real Chromium browser against the real Compose stack — no
+mocks, no dev server. It covers the same user-facing flows as
+`_docs/test-scenario.md`, but through the browser instead of direct HTTP:
+signup, room creation, upload, sharing the guest link, placing and
+replying to pins, resolve/reopen, approving the round, and closing the
+room.
+
+The suite uses two separate Playwright `BrowserContext`s per test —
+studio and guest — so they never share cookies, `localStorage`, or auth,
+exactly like a real studio and a real client reviewing from different
+browsers. `review-flow.spec.ts` runs the full scenario end to end in one
+test; `pin-position.spec.ts` independently checks that a pin's `%`-based
+position (`frontend/src/lib/pins/coords.ts`) survives the image being
+resized across several viewport sizes. Every "the other side sees this
+without reloading" assertion relies on the app's own 3-second polling
+(`POLL_MS` in `frontend/src/lib/queries.ts`), not on a push update — there
+are no WebSockets in this project (`_docs/decisions.md`) — and no
+`page.reload()` calls appear anywhere in the scenario spec.
+
+```
+make e2e
+```
+
+`make e2e` installs the Chromium browser binary if it isn't already
+present, then checks whether the stack is already reachable at
+`/health`. If it's already up (e.g. you already ran `make up`), the
+target leaves it running and does nothing further to it. If not, it
+starts the stack itself with the same command `make up` runs
+(`docker compose up -d --build --wait`), runs the suite, and — only in
+that case — tears the stack back down afterward with the same command
+`make down` runs (`docker compose down -v`). Either way, `make e2e` exits
+with the test run's own exit code and leaves the stack exactly as it
+found it.
+
+On failure, a trace and screenshot are kept (only on failure — see
+`e2e/playwright.config.ts`) and an HTML report is written under `e2e/`.
+
+See `e2e/README.md` for running the suite directly with
+`npx playwright test` (headless, `--headed`, `--debug`), and for opening
+the HTML report or a kept trace.

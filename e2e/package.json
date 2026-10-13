@@ -1,0 +1,14 @@
+{
+  "name": "pinpoint-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright end-to-end tests for Pinpoint, run against the real docker compose stack.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -362,3 +362,61 @@ verified. Consolidated into a narrative before submission.
   frontend-test` → 51 passed across 7 files (48 existing + 3 new); `npm run
   build` succeeds. QA verdict: PASS. Orchestrator closed issue #7 and
   pushed both commits to `main`.
+
+## 2026-10-13 — Issue #8: Dockerfile and Docker Compose
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer (resumed once
+  mid-task after it stalled waiting on a background process) + QA, each a
+  fresh session per `_docs/process.md`.
+- **PM input/output:** read the actual frontend build-output path, the
+  current base-URL selection logic, and the SQLAlchemy store before
+  writing criteria. Found a real, previously-unnoticed bug while reading
+  `index.ts`: an explicitly-empty `VITE_API_BASE_URL` (exactly what the
+  Docker build needs for same-origin requests) was falling through to
+  `MockApiClient` because the code used a truthiness check, not an
+  `undefined` check — made fixing this an explicit, in-scope criterion
+  rather than letting the container ship broken. Named exact Dockerfile
+  stage contents, exact compose service configs, and a Postgres
+  verification mechanism (a `profiles: ["test"]` compose service) chosen
+  specifically so Postgres is never exposed to the host in any invocation.
+  Flagged a datetime timezone mismatch between the store's parsed
+  timestamps and the schema's naive columns as a risk to watch for, not
+  asserted as a confirmed bug.
+- **Engineer input/output:** this pass stalled mid-task (a background
+  `npm install` wait went unresolved and the agent's turn ended on a stray
+  status line with nothing committed) — the orchestrator noticed no
+  commits/comment had landed, checked the repo directly, and resumed the
+  same agent with its own context intact rather than restarting from
+  scratch. On resume, it built the full two-stage image, the compose
+  stack, and the SPA-fallback backend route; found and fixed a real bug
+  the PM's flagged risk didn't predict (a different one): seeding all rows
+  in one flush with no ORM relationships let SQLite's deferred FK checks
+  pass silently while Postgres rejected it with a real
+  `ForeignKeyViolation` — fixed by flushing in parent-then-child batches.
+  Disclosed two deliberate deviations from the issue's literal text
+  (`npm install` instead of `npm ci`, since the committed lockfile is
+  missing Linux-only optional entries; copying `openapi.yaml` into the
+  image for the test profile) instead of silently reinterpreting scope.
+- **Review:** QA treated both disclosed deviations as things to verify, not
+  accept on faith — reproduced the exact `npm ci` failure in a scratch
+  build, then regenerated a Linux-complete lockfile to confirm `npm ci`
+  *would* work against it (judging the deviation justified under this
+  issue's own constraints, but flagging the lockfile regeneration as a
+  real follow-up). It also reverted the engineer's FK-ordering fix and
+  reran the Postgres suite to confirm the bug was genuinely real, not
+  just plausible-sounding.
+- **Verification:** `docker build` from scratch succeeds; the real
+  Postgres verification path (`docker compose --profile test run --rm
+  backend-test`) passes 81/81, run independently by both engineer and QA,
+  with QA additionally proving it would have failed without the fix;
+  `docker compose up -d --build --wait` brings up a healthy stack, serving
+  the demo rooms/photos at `localhost:8100` with Postgres unreachable from
+  the host; `_docs/test-scenario.md` steps 1–8 driven against the live
+  stack via script, including step 8's restart-persistence (`docker
+  compose restart app`) — now genuinely provable for the first time, since
+  this is the first issue where the running app is backed by real
+  Postgres instead of SQLite or memory; `docker compose down -v` leaves no
+  containers/volumes. Non-Docker regression: `make test` 81 passed
+  (SQLite), `make frontend-test` 51 passed, `npm run build` succeeds. QA
+  verdict: PASS. Orchestrator closed issue #8 and pushed all 6 commits to
+  `main`.

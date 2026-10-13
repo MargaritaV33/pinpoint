@@ -6,21 +6,17 @@
 FROM node:22-slim AS frontend-build
 WORKDIR /frontend
 
-# Lockfile is already committed. `npm ci` is the usual choice here, but the
-# committed package-lock.json (generated on a Windows dev machine) is
-# missing a couple of linux-only optional transitive entries
-# (@emnapi/core@1.11.3, @emnapi/runtime@1.11.3 — a wasm-fallback dependency
-# of a native build tool that resolves differently per OS) that only show up
-# when resolving on linux/amd64, which is what this stage always runs on.
-# `npm ci`'s strict lockfile-sync check fails on that gap with "Missing: ...
-# from lock file"; `npm install` resolves the same pinned versions plus
-# those two additions without requiring a hand-edited lockfile (confirmed:
-# `npm ci` fails identically under both npm 10.9.9 and npm 11.21.0, so this
-# is the lockfile's cross-platform completeness, not an npm-version issue).
-# See the PR/issue #8 comment for the full diagnosis — package.json and
-# package-lock.json are themselves untouched by this issue.
+# Lockfile is already committed. Issue #8 shipped `npm install` here because
+# the then-committed package-lock.json (generated on a Windows dev machine)
+# was missing linux-only optional transitive entries. Issue #9 regenerated
+# the lockfile once, on Linux, so it's now complete for linux/amd64 and
+# `npm ci`'s strict lockfile-sync check passes again — back to `npm ci` for
+# reproducible installs. This is a one-time fix to the committed lockfile's
+# content, not a build-time step: this stage must not regenerate the
+# lockfile on every build, which would reintroduce the non-determinism
+# `npm ci` exists to prevent.
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm install
+RUN npm ci
 
 COPY frontend/ .
 

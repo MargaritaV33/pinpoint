@@ -1,4 +1,4 @@
-.PHONY: sync run test frontend-test up down
+.PHONY: sync run test frontend-test up down integration
 
 sync:
 	cd backend && uv sync
@@ -17,3 +17,10 @@ up:
 
 down:
 	docker compose down -v
+
+# Drives an already-running Compose stack (`make up`) over real HTTP. Does
+# not start one itself — see docs/testing.md. Two invocations so the
+# persistence test (which restarts the `app` container) only runs, and
+# only once, after every independent scenario has already passed.
+integration:
+	cd integration && uv sync && uv run pytest tests/ --ignore=tests/test_persistence.py && uv run pytest tests/test_persistence.py

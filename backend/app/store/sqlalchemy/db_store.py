@@ -104,7 +104,18 @@ class SQLAlchemyStore(Store):
         self._engine = build_engine(database_url)
         Base.metadata.create_all(self._engine)
         self._Session = build_session_factory(self._engine)
-        self._seed()
+        # Seed only an empty database. `InMemoryStore` seeds unconditionally
+        # because it is always empty at construction (nothing survives
+        # between processes); a persistent SQLite file or Postgres database
+        # does not reset between restarts, so unconditionally reseeding here
+        # would try to re-insert the same seed primary keys on every restart
+        # and crash with an IntegrityError — defeating the whole point of
+        # this issue (data survives a restart). `reset()` below still always
+        # clears and reseeds explicitly, e.g. for tests.
+        with self._Session() as session:
+            already_seeded = session.scalar(select(StudioUser.id).limit(1)) is not None
+        if not already_seeded:
+            self._seed()
 
     def reset(self) -> None:
         with self._Session() as session:

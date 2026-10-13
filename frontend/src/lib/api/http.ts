@@ -98,7 +98,7 @@ export function createHttpApi(baseUrl: string): ApiClient {
       const headers: Record<string, string> = {};
       const t = token();
       if (t) headers["Authorization"] = `Bearer ${t}`;
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers, cache: "no-cache" });
       if (!res.ok) {
         let msg = res.statusText;
         try {

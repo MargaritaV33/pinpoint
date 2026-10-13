@@ -126,6 +126,10 @@ describe("http api: getImageObjectUrl", () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
       expect(url).toBe(`${BASE}/rooms/r1/images/i1/file`);
       expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer tok-present");
+      // Always revalidate against the server's ETag instead of serving a
+      // stale cached body (the bug #16's QA found when a seed image's bytes
+      // were swapped but the browser kept showing the old placeholder).
+      expect(init.cache).toBe("no-cache");
       return { ok: true, status: 200, statusText: "200", blob: async () => blob } as unknown as Response;
     });
     vi.stubGlobal("fetch", fetchMock);

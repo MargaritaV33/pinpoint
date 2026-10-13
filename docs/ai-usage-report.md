@@ -420,3 +420,50 @@ verified. Consolidated into a narrative before submission.
   (SQLite), `make frontend-test` 51 passed, `npm run build` succeeds. QA
   verdict: PASS. Orchestrator closed issue #8 and pushed all 6 commits to
   `main`.
+
+## 2026-10-13 — Issue #9: Integration tests
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`.
+- **PM input/output:** caught and corrected two inaccuracies in the task
+  description before they became wasted test coverage. First, the brief
+  asked for an "ETag/304" upload scenario — the PM re-read
+  `serializers.py` directly, confirmed (again, consistent with issues
+  #7/#16) that no conditional-GET logic exists anywhere in this codebase,
+  and rewrote the criterion to test ETag presence/stability only, not a
+  304 that was never built. Second, the brief assumed issue #8's QA pass
+  left behind a reusable verification script — the PM checked the repo and
+  issue #8's own comments and found that verification was inline,
+  never saved, and said so plainly rather than pointing the engineer at a
+  file that doesn't exist. Also made an explicit call on the bundled
+  lockfile fix: regenerate once and commit, not regenerate on every
+  Docker build, since the latter would undo the determinism `npm ci`
+  exists for.
+- **Engineer input/output:** built the full `integration/` suite (8 test
+  files, no backend imports, independent per-test setup), the
+  restart-persistence test (a real `docker compose restart app`, polling
+  `/health` with a bounded retry), `make integration`, `docs/testing.md`,
+  and the one-time lockfile regeneration that let the Dockerfile go back
+  to `npm ci`. Along the way it caught its own regression: running `make
+  frontend-test`'s `npm install` silently reverted the lockfile fix mid-
+  session — it noticed via `git status`, restored the file, and documented
+  the risk in `docs/testing.md` instead of letting a future session
+  rediscover it blind. Also disclosed an honest timing nuance rather than
+  overselling the fail-fast requirement: the stack-down failure is
+  readable and never hangs, but takes ~59s end-to-end on this
+  Windows/Docker Desktop setup, not literally "a few seconds."
+- **Review:** QA treated both engineer-disclosed nuances as things to
+  verify, not take on faith — reproduced the lockfile-reversion risk
+  itself (confirmed `npm install` really does strip the Linux-only
+  entries again), and used `docker inspect`'s container start timestamps
+  to independently confirm the persistence test's restart was genuinely
+  real (app's `StartedAt` ~8s old, postgres untouched at 13 minutes
+  uptime) rather than a no-op. Judged the ~60s fail-fast timing an
+  acceptable engineering tradeoff, not a gap, while still flagging it as
+  worth a documentation caveat.
+- **Verification:** `make integration` → 15/15 passing against the live
+  compose stack (run independently by engineer and QA); `docker build
+  --no-cache` with `npm ci` succeeds from a clean state (verified by both
+  passes); `make test` 81 passed (SQLite), `make frontend-test` 51 passed,
+  `npm run build` succeeds, the Postgres path 81 passed. QA verdict: PASS.
+  Orchestrator closed issue #9 and pushed all 3 commits to `main`.

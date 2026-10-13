@@ -34,6 +34,17 @@ against the mock API client (`frontend/src/lib/api/mock.ts`).
 make frontend-test
 ```
 
+Caution: this target's `npm install` step (not `npm ci`) re-resolves
+`frontend/package-lock.json` against whatever platform it runs on. Running
+it on a non-linux/amd64 machine (e.g. Windows, during local development)
+can silently rewrite away the linux-only optional entries
+(`@emnapi/core`/`@emnapi/runtime`) that issue #9 regenerated so the
+Dockerfile's `npm ci` passes — observed directly while verifying that
+issue. If `git status` shows `frontend/package-lock.json` changed after
+running this target, check the diff before committing; if it dropped those
+entries, restore the committed version (`git checkout --
+frontend/package-lock.json`) rather than committing the rewrite.
+
 ## Integration
 
 A separate `uv` project (`integration/`) that drives an **already-running**

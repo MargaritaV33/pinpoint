@@ -122,6 +122,32 @@ def test_get_room_image_file_unknown_image_is_404(client: TestClient, auth_heade
     assert response.status_code == 404
 
 
+# -- seed images are the real demo photos, not flat-color placeholders ------------
+# The old placeholders were a few KB; the real renders copied from
+# `frontend/src/assets/render-*.jpg` are well over 100 KB. A byte-length floor
+# well above the old placeholder size (but safely below any real photo)
+# proves the actual photo is being served, not just a same-named file.
+_OLD_PLACEHOLDER_MAX_BYTES = 10_000
+
+
+def test_guest_seed_image_is_real_photo_not_placeholder(client: TestClient) -> None:
+    response = client.get("/guest/lakeside-demo/images/i_facade/file")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert len(response.content) > _OLD_PLACEHOLDER_MAX_BYTES
+
+
+def test_studio_seed_images_are_real_photos_not_placeholders(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    for room_id, image_id in [("r_lakeside", "i_facade"), ("r_lakeside", "i_living"), ("r_atrium", "i_atrium")]:
+        response = client.get(f"/rooms/{room_id}/images/{image_id}/file", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert len(response.content) > _OLD_PLACEHOLDER_MAX_BYTES
+
+
 def test_get_room_image_file_cross_room_is_404(client: TestClient, auth_headers: dict[str, str]) -> None:
     # i_atrium belongs to r_atrium, not r_lakeside.
     response = client.get("/rooms/r_lakeside/images/i_atrium/file", headers=auth_headers)

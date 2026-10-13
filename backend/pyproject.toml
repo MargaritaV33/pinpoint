@@ -7,9 +7,11 @@ dependencies = [
     "bcrypt<4.1",
     "fastapi>=0.115",
     "passlib[bcrypt]>=1.7.4",
+    "psycopg[binary]>=3.2",
     "pydantic-settings>=2.15.0",
     "pyjwt>=2.15.1",
     "python-multipart>=0.0.32",
+    "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.30",
 ]
 

@@ -1,8 +1,9 @@
-"""The only concrete `Store` for this issue. Plain Python objects in memory —
-no persistence beyond the process's lifetime. Issue #6 adds a
-`SQLAlchemyStore(Store)` alongside this one; nothing outside this module and
-`main.py`'s wiring (via `store/__init__.py`) may import `InMemoryStore`
-directly.
+"""Plain Python objects in memory — no persistence beyond the process's
+lifetime. Unused by the running app since issue #6, which wired
+`store/__init__.py`'s singleton to `SQLAlchemyStore` instead (the real store
+needed so data survives a backend restart). Kept here as a correct `Store`
+reference implementation and for anyone who wants a fast, DB-free test
+double later.
 """
 
 from __future__ import annotations

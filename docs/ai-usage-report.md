@@ -328,3 +328,37 @@ verified. Consolidated into a narrative before submission.
   Orchestrator closed issue #6 and pushed the two implementation commits
   (plus one unrelated commit the repo owner made directly between sessions,
   moving `make-it-better.md` out of the public repo) to `main`.
+
+## 2026-10-13 — Issue #7: Image upload and serving
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`.
+- **PM input/output:** framed this explicitly as a verify-and-harden pass
+  rather than a rebuild, since most of the original scope (JPG/PNG
+  validation, the 15 MB limit, ETag/Cache-Control) already shipped in
+  issues #4/#16. Read `useImageSrc.ts` closely enough to name the exact
+  leak mechanics (an object URL created by an in-flight fetch that resolves
+  after the effect already cancelled was being discarded instead of
+  revoked) and wrote the fix as literal code in the issue, not a vague
+  description. Did the same for the stale-cache fix (`cache: "no-cache"`,
+  explicitly not `"no-store"`, with the reasoning for the distinction
+  spelled out). Confirmed, by reading the backend and the contract, that no
+  backend change was needed at all — stated that plainly rather than
+  inventing busywork.
+- **Engineer input/output:** confirmed the Verify section by reading code
+  and running the existing suite untouched, then applied both fixes
+  exactly as specified, plus three new vitest cases for the leak fix
+  covering late resolution, the normal path, and rapid image switching.
+  Touched only the four files the issue named.
+- **Review:** QA went beyond reading the new tests — it actually reverted
+  the leak fix in a scratch copy and re-ran the new test suite to confirm
+  it would genuinely catch the regression (2 of the 3 new cases failed as
+  expected; the case that doesn't exercise the cancelled branch correctly
+  still passed, proving the coverage isn't tautological), then restored the
+  fix and confirmed a clean tree. Also confirmed via `git log --stat` that
+  zero backend files were touched, matching the "no backend changes
+  expected" constraint.
+- **Verification:** `make test` → 75 passed (backend, unchanged); `make
+  frontend-test` → 51 passed across 7 files (48 existing + 3 new); `npm run
+  build` succeeds. QA verdict: PASS. Orchestrator closed issue #7 and
+  pushed both commits to `main`.

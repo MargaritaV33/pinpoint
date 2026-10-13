@@ -276,3 +276,55 @@ verified. Consolidated into a narrative before submission.
   Orchestrator closed issue #16 and pushed all 5 commits (2 of them the
   repo owner's own direct `.gitattributes`/decisions.md commits, made
   outside this session) to `main`.
+
+## 2026-10-13 — Issue #6: Persistence with SQLAlchemy
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`.
+- **PM input/output:** read `store/interface.py` and `store/memory.py`
+  closely before writing criteria, confirming the business rules
+  (sequential pin numbering, reopen-on-reply, closed-room rejections,
+  session-based logout revocation) live in router code calling plain
+  `Store` primitives — not in the store itself — which meant the existing
+  issue #4 test suite, unchanged, could serve as the drift-detector proving
+  the new store behaves identically. Confirmed the frontend-asset-to-seed-
+  image mapping by matching ids between `seed.py` and `mock-seed.ts`,
+  not by eyeballing the photos. Caught an edge case the backlog missed: a
+  SQL store has no guaranteed row order without an explicit `ORDER BY`,
+  unlike `InMemoryStore`'s free dict-insertion ordering — made this an
+  explicit, separate criterion. Made firm, stated calls on sync SQLAlchemy,
+  keeping `InMemoryStore` as an unused reference implementation rather than
+  deleting it, and a `TEST_DATABASE_URL` opt-in with no partial-skip state
+  for the Postgres test path.
+- **Engineer input/output:** built the full SQLAlchemy storage layer
+  (models, engine, store) against the `Store` ABC, wired it in as the
+  app's real store, replaced the three placeholder seed images with the
+  frontend's real Lovable renders (one-way copy, `seed.py` untouched), and
+  added dependencies via `uv add`. Found and fixed a real bug its own
+  first-draft implementation introduced: seeding unconditionally on every
+  `SQLAlchemyStore.__init__` crashed on a second restart against a
+  persistent database — exactly the scenario the issue's own goal
+  describes — fixed by seeding only when the database is empty, and
+  flagged the deviation explicitly rather than silently patching it in.
+  Reported honestly, rather than skipping silently, that the Postgres path
+  couldn't be verified in its sandbox (no reachable Docker daemon or
+  `psql`).
+- **Review:** QA didn't just read the fix, it reproduced the
+  restart-persistence proof itself end-to-end (start server, create a
+  room, kill every process on the port, restart, confirm no duplicates/no
+  crash), wrote a throwaway script to prove the `Store` ABC's
+  "missing-method fails loudly" guarantee actually holds for the real
+  class, and ran `sha256sum` to confirm the replacement seed images are
+  genuinely byte-for-byte identical to the frontend's source files rather
+  than just same-named. Independently hit the same Postgres-unreachable
+  wall and correctly treated it as an environment constraint, not a FAIL,
+  consistent with how issues #5/#16 handled checks outside the pipeline's
+  reach.
+- **Verification:** `make test` → 75 passed, 0 failed (full issue #4 suite
+  intact plus two new seed-image tests, run independently by engineer and
+  QA); live restart-persistence proof reproduced twice; seed image
+  checksums confirmed; Postgres path explicitly marked
+  could-not-verify/environment-constraint by both passes. QA verdict: PASS.
+  Orchestrator closed issue #6 and pushed the two implementation commits
+  (plus one unrelated commit the repo owner made directly between sessions,
+  moving `make-it-better.md` out of the public repo) to `main`.

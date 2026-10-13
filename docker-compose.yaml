@@ -1,0 +1,86 @@
+# Postgres-backed Pinpoint, same-origin (one image, no CORS). See
+# _docs/decisions.md's "Containers"/"Database" rows and issue #8.
+#
+# Variables come from Compose's own automatic root-level .env loading (no
+# explicit env_file: block) — the same root .env used for local, non-Docker
+# dev. DATABASE_URL and VITE_API_BASE_URL are the two deliberate exceptions
+# (see root README's "Environment variables" table and .env.example's
+# comments): DATABASE_URL is rebuilt here from the POSTGRES_* vars so this
+# stack is never accidentally pointed at the host .env's SQLite default, and
+# VITE_API_BASE_URL is hardcoded to "" below so the frontend is always built
+# for same-origin requests inside the container.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pinpoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pinpoint}
+      POSTGRES_DB: ${POSTGRES_DB:-pinpoint}
+    volumes:
+      - pinpoint-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    # No ports: — not reachable from the host, only from other services on
+    # the default compose network. This is load-bearing: the backend-test
+    # service below is how the Postgres path gets verified without ever
+    # publishing this port.
+
+  app:
+    build:
+      context: .
+      args:
+        # Literal empty string, not ${VITE_API_BASE_URL} — see header
+        # comment. Must never read the root .env's
+        # VITE_API_BASE_URL=http://localhost:8091 default, which is for the
+        # separate-ports two-terminal local-dev recipe, not this topology.
+        VITE_API_BASE_URL: ""
+    ports:
+      - "${APP_PORT:-8100}:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Built from the Postgres vars + the fixed service hostname `postgres`
+      # — never ${DATABASE_URL} straight from the root .env (that file's
+      # default is sqlite:///./pinpoint.db, for make run/non-Docker use; it
+      # must not leak in here and silently run this stack on SQLite).
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pinpoint}:${POSTGRES_PASSWORD:-pinpoint}@postgres:5432/${POSTGRES_DB:-pinpoint}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8091}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-60}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  # Runs the backend test suite for real against this stack's own Postgres.
+  # `profiles: ["test"]` keeps a plain `docker compose up` from ever
+  # starting this — see root README/issue #8. Postgres stays unpublished in
+  # every invocation; this runs pytest from inside a container on the same
+  # compose network instead of exposing the port to the host.
+  #
+  # Documented, exact command:
+  #   docker compose up -d --wait postgres && docker compose --profile test run --rm backend-test
+  backend-test:
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: ""
+    profiles: ["test"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pinpoint}:${POSTGRES_PASSWORD:-pinpoint}@postgres:5432/${POSTGRES_DB:-pinpoint}
+    working_dir: /app/backend
+    command: ["sh", "-c", "uv sync --frozen && uv run pytest"]
+
+volumes:
+  pinpoint-postgres-data:

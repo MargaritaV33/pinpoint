@@ -13,9 +13,7 @@ frontend-test:
 	cd frontend && npm install && npm test
 
 up:
-	@echo "make up is not implemented yet; see issue #8 (Dockerfile and Docker Compose)."
-	@exit 1
+	docker compose up -d --build --wait
 
 down:
-	@echo "make down is not implemented yet; see issue #8 (Dockerfile and Docker Compose)."
-	@exit 1
+	docker compose down -v

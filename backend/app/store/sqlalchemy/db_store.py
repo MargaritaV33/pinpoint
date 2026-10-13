@@ -131,12 +131,25 @@ class SQLAlchemyStore(Store):
         self._seed()
 
     def _seed(self) -> None:
+        # Flushed per batch (not one flush at the end) so each table's INSERTs
+        # reach the database in parent-before-child order: comments -> pins ->
+        # images -> rooms, same dependency direction as reset()'s deletes
+        # above. Without an explicit relationship() between these mapped
+        # classes, the ORM's flush does not otherwise guarantee that order
+        # across unrelated mapper classes in a single flush, and the models
+        # are deliberately raw ForeignKey columns with no relationship()
+        # (see models.py). SQLite's FK enforcement is off by default, so this
+        # was silently fine there; Postgres enforces it and raised
+        # `ForeignKeyViolation: Key (pin_id)=(p1) is not present in table
+        # "pins"` the first time this ran against a real Postgres instance —
+        # confirmed while implementing issue #8's Postgres verification.
         with self._Session() as session:
             for u in seed.seed_users():
                 password_hash = (
                     _DEMO_PASSWORD_HASH if u.password == seed.DEMO_PASSWORD else hash_password(u.password)
                 )
                 session.add(StudioUser(id=u.id, email=u.email, name=u.name, password_hash=password_hash))
+            session.flush()
             for r in seed.seed_rooms():
                 session.add(
                     Room(
@@ -151,6 +164,7 @@ class SQLAlchemyStore(Store):
                         approved_by=r.approved_by,
                     )
                 )
+            session.flush()
             for i in seed.seed_images():
                 data = seed.read_seed_image_bytes(i.filename)
                 session.add(
@@ -164,6 +178,7 @@ class SQLAlchemyStore(Store):
                         created_at=_parse_dt(i.created_at),
                     )
                 )
+            session.flush()
             for p in seed.seed_pins():
                 session.add(
                     Pin(
@@ -177,6 +192,7 @@ class SQLAlchemyStore(Store):
                         created_at=_parse_dt(p.created_at),
                     )
                 )
+            session.flush()
             for c in seed.seed_comments():
                 session.add(
                     Comment(

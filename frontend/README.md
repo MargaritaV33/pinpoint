@@ -40,8 +40,12 @@ client, and app routing).
 npm run build
 ```
 
-Produces a static production bundle (TypeScript is checked as part of the
-build; there are no type errors in a passing build).
+Produces a static production bundle at `.output/public/`, with
+`.output/public/_shell.html` as the static SPA shell served for every path
+(TypeScript is checked as part of the build; there are no type errors in a
+passing build). This is the directory the root `Dockerfile` copies into the
+backend image — see root `README.md`'s "Running with Docker Compose"
+section.
 
 ## Mock vs. HTTP client
 

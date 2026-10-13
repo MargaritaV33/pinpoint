@@ -62,13 +62,22 @@ test("studio and guest review a room end to end", async ({ browser }) => {
   await guestPage.goto(guestUrl);
   await guestPage.getByLabel("Your name").fill(guestDisplayName);
   await guestPage.getByRole("button", { name: "Continue" }).click();
+  // The welcome dialog's overlay stays in the DOM (and blocks clicks)
+  // through its exit animation; wait for it to fully unmount before
+  // clicking the image underneath.
+  await expect(guestPage.getByRole("dialog")).not.toBeVisible();
 
   // --- Guest: place a pin at 40%/60% of the image, write the first comment, submit ---
-  const guestImage = guestPage.locator("img").first();
+  // The thumbnail rail also renders an <img> (with alt=""), so scope to
+  // the main stage image via its non-empty alt text (image.title) instead
+  // of just taking the first <img> on the page.
+  const guestImage = guestPage.getByAltText(/.+/);
   await expect(guestImage).toBeVisible();
   const guestBox = await guestImage.boundingBox();
   if (!guestBox) throw new Error("Image bounding box not available");
-  await guestPage.mouse.click(guestBox.x + guestBox.width * 0.4, guestBox.y + guestBox.height * 0.6);
+  // locator.click() (unlike page.mouse.click()) auto-waits for the target
+  // point to be free of overlapping elements.
+  await guestImage.click({ position: { x: guestBox.width * 0.4, y: guestBox.height * 0.6 } });
 
   const fixRadio = guestPage.getByRole("radio", { name: "Fix" });
   await expect(fixRadio).toHaveAttribute("aria-checked", "true");

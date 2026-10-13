@@ -29,7 +29,9 @@ const TOLERANCE = 0.5; // percentage points
 
 async function measurePinPercent(page: import("@playwright/test").Page) {
   const pin = page.getByRole("button", { name: /^Pin 1:/ });
-  const image = page.locator("img").first();
+  // The thumbnail rail also renders an <img> (with alt=""), so scope to
+  // the main stage image via its non-empty alt text (image.title).
+  const image = page.getByAltText(/.+/);
   const pinBox = await pin.boundingBox();
   const imageBox = await image.boundingBox();
   if (!pinBox || !imageBox) throw new Error("Could not read bounding boxes");
@@ -81,12 +83,20 @@ test("pin position survives viewport resize", async ({ browser }) => {
   await page.goto(guestUrl);
   await page.getByLabel("Your name").fill("Resize Tester");
   await page.getByRole("button", { name: "Continue" }).click();
+  // The welcome dialog's overlay stays in the DOM (and blocks clicks)
+  // through its exit animation; wait for it to fully unmount before
+  // clicking the image underneath.
+  await expect(page.getByRole("dialog")).not.toBeVisible();
 
-  const image = page.locator("img").first();
+  // The thumbnail rail also renders an <img> (with alt=""), so scope to
+  // the main stage image via its non-empty alt text (image.title).
+  const image = page.getByAltText(/.+/);
   await expect(image).toBeVisible();
   const box = await image.boundingBox();
   if (!box) throw new Error("Image bounding box not available");
-  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.6);
+  // locator.click() (unlike page.mouse.click()) auto-waits for the target
+  // point to be free of overlapping elements.
+  await image.click({ position: { x: box.width * 0.4, y: box.height * 0.6 } });
   await page.getByPlaceholder("What should change?").fill("Resize check pin");
   await page.getByRole("button", { name: "Add pin" }).click();
   await expect(page.getByRole("button", { name: /^Pin 1:/ })).toBeVisible();

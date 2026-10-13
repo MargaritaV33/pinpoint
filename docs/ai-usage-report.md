@@ -467,3 +467,49 @@ verified. Consolidated into a narrative before submission.
   passes); `make test` 81 passed (SQLite), `make frontend-test` 51 passed,
   `npm run build` succeeds, the Postgres path 81 passed. QA verdict: PASS.
   Orchestrator closed issue #9 and pushed all 3 commits to `main`.
+
+## 2026-10-13 — Issue #10: End-to-end test with Playwright
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`. First issue in this project driving a
+  real browser (Playwright's own Chromium, not a mocked/dev-server
+  frontend) against the real Compose stack.
+- **PM input/output:** read the actual frontend route components before
+  writing a single UI interaction into the criteria, rather than inventing
+  plausible-sounding selectors. Found that "copy guest link" isn't a
+  persistent DOM link at all — it's a clipboard-write plus a toast whose
+  visible text happens to be the same URL — and wrote the test's real
+  mechanism instead of a stand-in. Pulled exact DOM strings (the closed-
+  room banner, the "approved by" template, the literal lowercase
+  `"resolved"` text) straight from the components so the test couldn't
+  silently assert invented wording. Designed the `make e2e` start/teardown
+  symmetry (leave the stack exactly as found) as an explicitly testable
+  pair of scenarios, not just a described intention.
+- **Engineer input/output:** built both spec files and the orchestration
+  script per the groomed spec, fixed two genuine test-side selector bugs
+  against the real running app (a thumbnail `<img>` shadowing the main
+  stage image; a dialog overlay still intercepting clicks mid-exit-
+  animation) rather than loosening the assertions. Found a real
+  acceptance-criterion impossibility and handled it exactly per
+  `_docs/team/software-engineer.md`'s rule — commented on the issue with
+  code/contract evidence instead of silently editing the criterion or
+  adding an unrequested studio pin-creation feature: the app has no
+  studio-side pin-creation path at all (confirmed via both the route
+  wiring and `openapi.yaml`), so the resize test places its pin through a
+  guest context while keeping everything else as specified.
+- **Review:** QA independently re-derived the same conclusion on the
+  flagged deviation (re-reading the same route file and contract) before
+  accepting it, rather than taking the engineer's citation at face value.
+  Ran the full suite three times to rule out flakiness, verified both
+  directions of the start/teardown symmetry itself, and deliberately broke
+  a *different* assertion than the engineer had to confirm the
+  trace/report mechanism isn't something that only works for one specific
+  failure.
+- **Verification:** `npx playwright test` — 2/2 passing, three consecutive
+  runs, no flakiness (18–30s each); `make e2e` symmetry confirmed both
+  ways (stack-already-up leaves the same container IDs; stack-down starts,
+  runs, and tears back down to empty); a real `trace.zip`/HTML
+  report produced and inspected on an injected failure, then cleanly
+  reverted; `make test` 81 passed, `make frontend-test` 51 passed, `npm run
+  build` succeeds. QA verdict: PASS. Orchestrator closed issue #10 and
+  pushed both commits to `main`.

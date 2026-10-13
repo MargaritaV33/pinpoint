@@ -25,7 +25,10 @@ export function useImageSrc(image: Pick<RenderImage, "url"> | null | undefined):
     api
       .getImageObjectUrl(image.url)
       .then((resolved) => {
-        if (cancelled) return;
+        if (cancelled) {
+          URL.revokeObjectURL(resolved);
+          return;
+        }
         objectUrl = resolved;
         setSrc(resolved);
       })

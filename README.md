@@ -1,5 +1,7 @@
 # Pinpoint
 
+[![CI](https://github.com/MargaritaV33/pinpoint/actions/workflows/ci.yml/badge.svg)](https://github.com/MargaritaV33/pinpoint/actions/workflows/ci.yml)
+
 Client feedback on architectural visualization renders: a studio opens a review
 room, uploads the renders of a round and shares one link; the client drops
 numbered pins on the images and says what to change; the studio replies,

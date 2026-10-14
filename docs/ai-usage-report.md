@@ -1452,3 +1452,10 @@ standard the project settled on only after being burned once.
   Render's dashboard is owner-only, so the cause is unconfirmed: it needs the
   `pinpoint` service's Events and Logs tabs. Production may be serving
   nothing right now; see the batch summary.
+- **Update on the failed deploy trigger:** the next push (`d139943`, a log
+  line only) passed every job including `deploy`, and the live `/health`
+  returned `200` afterwards, so the earlier 500 from the deploy hook and the
+  502s from the live service were a transient Render-side condition that
+  cleared by itself. The cause was never seen (no dashboard access), so it is
+  unexplained rather than ruled out. The "production may be serving
+  nothing" note above is no longer true.

@@ -1136,3 +1136,34 @@ standard the project settled on only after being burned once.
   parked in the gitignored `_local/make-it-better.md`. The orchestrator
   reviewed these as in-scope groomings and kept the owner's scope of
   "Bash commands" rather than widening the matcher.
+- **Engineer input/output:** was given the groomed issue and the
+  orchestrator's clarification that the live hook check runs in a throwaway
+  clone with a local bare `origin` and a dummy env file, because local
+  `main` cannot equal `origin/main` once the hook is committed. Built
+  `agent-hooks/`: a stdlib-only `pretool_bash_guard.py` with five rules, a
+  `posttool_test_reminder.py`, and a POSIX `run.sh` launcher. Wired both in
+  `.claude/settings.json` with `hooks` placed before `attribution`, so the
+  attribution line is byte-identical and the diff is additions only. Added
+  `make hooks-test` and a CI `hooks` job kept out of `stack.needs` and
+  `deploy.needs`. Wrote 52 `unittest` tests that call the scripts as
+  subprocesses with stdin JSON. Wrote `agent-hooks/README.md`,
+  `docs/permissions.md`, three rows in the extension-pack table and
+  `custom-agent/README.md` with a real `on-call-responder` run on the
+  verbatim #12 reopening comment. Four commits, two issue comments (live
+  evidence, implementation summary), nothing pushed.
+- **Review:** rejected a fail-closed launcher, since a missing Python
+  would block the Bash command needed to repair the hook. Rejected moving
+  `on-call-responder` into `custom-agent/`, which would break loading and
+  the `agents-sync` job. Rejected recursing into `bash -c` and `eval`
+  strings because the issue lists them as documented gaps and the docs
+  would otherwise overclaim. Kept heredoc bodies and quoted text as data so
+  commit messages that mention a blocked pattern are not blocked. Made the
+  env-file rule deny by default with a short non-printing allowlist rather
+  than a list of verbs, which also means `cp .env.example .env` is denied
+  in an agent's shell; the Engineer hit this itself and used the
+  PowerShell tool for the dummy file. It did not fix stale lines 26 and 43
+  of `docs/deployment.md` (they still describe the removed
+  `dockerCommand`, found by the `on-call-responder` run) because that file
+  is outside the issue's file list. It did not present the example run as
+  an independent diagnosis: the agent read `render.yaml` and this report,
+  which already held the corrected cause, and said so.

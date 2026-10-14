@@ -1386,3 +1386,51 @@ standard the project settled on only after being burned once.
   mcp-test` as make targets (no `uv`), the rest of `make integration` and
   `make e2e` (no Compose stack was run), CI until pushed, and the YAML
   against a real OpenAPI validator (the repo has none).
+
+## 2026-10-14 — Issue #21: Run the MCP server integration test in the CI stack job
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. #21 was filed during #19's grooming; the
+  PM groomed it properly in this batch.
+- **PM input/output:** verified the draft against `ci.yml`, the Makefile,
+  `mcp-server/`, the seed and `docs/permissions.md`. Decided the test runs
+  inside the existing `stack` job through a new `make mcp-integration`
+  target (no second Compose bring-up, no new job), that a skipped or empty
+  run must make the command fail, that no secret is used (the seeded demo
+  account is public), and that the `mcp` job and `deploy.needs` stay
+  unchanged. Checked that `integration/` never touches the seed rooms the
+  MCP test asserts on. Rewrote the draft's "broken tool shown once in the
+  PR" criterion, since there is no PR flow, main history must stay green,
+  and agents may not delete a throwaway branch: the Engineer instead
+  demonstrates red, green and revert locally against the real Compose
+  stack, and the CI-side proof (new step in the `stack` log, 6 passed, 0
+  skipped) became a criterion owned by the orchestrator after the push.
+- **Orchestrator decisions on the PM's open questions:** accepted that a
+  red MCP integration test now blocks `deploy`, since the issue title puts
+  it in `stack` (reported to the owner); dropped the PM's `AGENTS.md`
+  Commands-line edit because that file is owner-controlled.
+- **Engineer input/output:** three commits. An opt-in guard in
+  `mcp-server/tests/conftest.py` (`PINPOINT_REQUIRE_INTEGRATION`) turns a
+  skip or an empty run into a non-zero exit naming `PINPOINT_BASE_URL`, so
+  the `mcp` job's plain `uv run pytest -rs` is unchanged. A `make
+  mcp-integration` target uses `${PINPOINT_BASE_URL-...}` rather than
+  `:-` so an explicitly empty value stays empty and trips the guard. One
+  seven-line step in `stack` between the integration and e2e steps. Docs in
+  `docs/testing.md` and `mcp-server/README.md`. The first demo run masked
+  exit codes through pipes; the Engineer noticed and reran it with real
+  exit codes. Real run against `make up`: 6 passed, 0 skipped; with
+  `list_rooms` broken in the working tree, exit 1 naming
+  `test_list_rooms_contains_both_demo_rooms`; empty URL exit 1; nothing
+  collected exit 5; `make down` left no residue.
+- **QA input/output (PASS, criterion 9 pending):** ran its own red/green
+  run on the real stack, the guard cases, the real Makefile recipe with a
+  throwaway `uv` stand-in, parsed `ci.yml`, checked the diff is exactly
+  one step with no `if:`, `continue-on-error`, secrets or vars and no
+  `needs` change, and that the diff is the five whitelisted files with
+  `AGENTS.md` untouched.
+- **Review:** nothing rejected after QA. The stand-in proves the Makefile
+  text but not `uv`; `uv sync --frozen` and `uv run` are proven only by CI.
+- **Verification:** commands above. **Not verified before the push:**
+  `uv` itself, anything in GitHub Actions, `make test`, `make
+  frontend-test` and `make integration` (nothing in backend, frontend or
+  the API changed).

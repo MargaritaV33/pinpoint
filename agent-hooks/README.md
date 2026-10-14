@@ -60,7 +60,7 @@ echoed (it is a secret), so a denial does not copy a secret into the transcript.
 |---|---|---|---|
 | 1 | No force push to `main` / `master`, and no deleting it | `git push --force origin main`, `-f`, `--force-with-lease origin main`, `git push origin +main`, `--force origin HEAD:main`, `--force origin refs/heads/main`, a force push with **no** refspec (it may target the current branch), `git push origin --delete main`, `git push origin :main` | `git push origin main`, `git push`, `git push --force-with-lease origin feature/x`, `git push -f origin my-branch` |
 | 2 | `_local/` is read-only for the shell | `rm`, `mv`, `cp` into it, `touch`, `truncate`, `sed -i`, `tee`, `>` / `>>`, `git clean`, `git checkout --` aimed at it, in any spelling (`_local/x`, `./_local/x`, `"_local/x"`, `_local\x`, this repo's absolute path plus `/_local/`) | `cat _local/make-it-better.md`, `ls _local`, `grep -n foo _local/make-it-better.md` |
-| 3 | Real `.env` files stay out of the shell | any command other than a small non-printing list (`ls`, `test`, `stat`, `wc`, `git`, `docker`, `make`, ...) whose arguments name `.env`, `./.env`, `backend/.env`, `"$PWD/.env"`, `.env.local`, `.env.production`; `>` / `>>` / `<` on them; `cp .env.example .env` | `cat .env.example`, `grep -n JWT .env.example`, `docker compose up`, `make up` |
+| 3 | Real `.env` files stay out of the shell | any command other than a small non-printing list (`ls`, `test`, `stat`, `wc`, `git`, `docker`, `make`, ...) whose **file** arguments name `.env`, `./.env`, `backend/.env`, `"$PWD/.env"`, `.env.local`, `.env.production`; `>` / `>>` / `<` on them; `cp .env .env.bak`, `cp .env.example .env.local`, `cat .env.example > .env`; `grep JWT .env`, `grep -f .env foo`, `find . -name ".env*" -exec cat {} +` | `cp .env.example .env` (the only way an agent writes `.env`), `cat .env.example`, `grep -n JWT .env.example`, `cp .env.example .env.example.bak`, `grep -rn ".env" docs`, `find . -name ".env*"`, `for f in .env .env.local; do echo "$f"; done`, `echo .env`, `docker compose up`, `make up` |
 | 4 | No recursive `rm` outside the repo | `rm -rf /`, `~`, `$HOME`, `..`, `../other`, `/tmp/x`, `C:\Users\x`, `/c/Users/x`; flags split across words; a target with a variable, `$(...)`, backticks or brace expansion (the message says it cannot be resolved) | `rm -rf node_modules`, `rm -rf ./frontend/dist`, `rm -rf backend/.pytest_cache`; a plain `rm file` outside the repo |
 | 5 | The Render deploy hook is CI's job | `curl`, `wget`, `Invoke-WebRequest`/`iwr`, `Invoke-RestMethod`/`irm` whose arguments contain `render.com/deploy` or `RENDER_DEPLOY_HOOK_URL` (`$...`, `${...}`, `%...%`, `$env:...`) | `curl http://localhost:8100/health`, `curl https://<anything>.onrender.com/health`, `gh run list` |
 
@@ -77,6 +77,25 @@ Details worth knowing:
   and backticks are scanned as commands of their own.
 - A rule applies to the command word after `sudo`, `env`, `xargs`, `time`,
   `command`, leading `VAR=value` and similar wrappers.
+- Rule 3 tells a **mention** of `.env` from a **file operand**. Mentions cannot
+  print or change file contents and are allowed: the pattern of `grep`,
+  `egrep`, `fgrep`, `zgrep` and `rg` (the first non-option word, or the value of
+  `-e` / `--regexp`), the pattern after `find -name`, `-iname`, `-path` and
+  similar, the word list of a `for` loop, and the text of `echo` and `printf`.
+  Every other word is a file operand and is checked. Where the parser cannot
+  tell (an option it does not know), the word counts as a file: the failure
+  direction is "denied". `grep -f FILE`, `--include=`/`-g` globs and `find`
+  start points are file operands.
+- A template is `.env` plus dot-segments whose last non-backup segment is
+  `example`, `sample`, `template` or `dist`, with at most one backup suffix
+  (`bak`, `backup`, `orig`, `old`, `tmp`, `save`): `.env.example`,
+  `.env.local.example`, `.env.example.bak`. `.env.bak`, `.env.local.bak` and
+  `.env.example.local` are real files.
+- The only way an agent may write `.env` is `cp <template> .env`: exactly two
+  operands, no `-t`, a template source, a destination whose last component is
+  exactly `.env` (any directory prefix). It overwrites an existing `.env`
+  without asking; the guard does not check whether it exists (run `test -f .env`
+  first). Owner decision of 14 Oct 2026, recorded in `_docs/decisions.md`.
 
 ## The launcher and the fail-open decision
 
@@ -184,6 +203,13 @@ Honest list; the full version, with the owner-only list, is in
   Edit/Write.
 - `echo $JWT_SECRET` and `printenv` are not blocked: the guard looks at file
   names, not at the environment.
+- `find ... -name ".env*" -exec` is only caught for the printing/exec actions
+  the guard knows (`-exec`, `-execdir`, `-ok`, `-okdir`, `-fprint*`, `-fls`,
+  `-delete`) and only when the pattern itself names an env file.
+  `cat $F`, `grep -r JWT .` and `git grep` reach a real env file without naming
+  it, so they are not caught either.
+- `cp .env.example .env` overwrites an existing `.env` and is not refused
+  (parked in `_local/make-it-better.md`, row 17).
 - A person can disable the hooks in `.claude/settings.local.json`.
 - The launcher is fail-open: with no working Python, or on any internal
   problem, the command runs unchecked after one warning line.

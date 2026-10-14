@@ -1,4 +1,4 @@
-.PHONY: sync run test frontend-test up down integration e2e sync-agents mcp-test hooks-test
+.PHONY: sync run test frontend-test up down integration e2e sync-agents mcp-test mcp-integration hooks-test
 
 sync:
 	cd backend && uv sync
@@ -45,9 +45,22 @@ sync-agents:
 
 # Unit tests of the read-only MCP server (mcp-server/). HTTP is mocked with
 # respx: no backend or Docker needed. The integration test in the same folder
-# is skipped unless PINPOINT_BASE_URL is set; see mcp-server/README.md.
+# is skipped unless PINPOINT_BASE_URL is set; see mcp-server/README.md. To run
+# that integration test against a running stack, use `make mcp-integration`.
 mcp-test:
 	cd mcp-server && uv run pytest
+
+# Runs only mcp-server/tests/test_integration.py against an already-running
+# Compose stack (`make up`), like `make integration`. PINPOINT_BASE_URL
+# defaults to Compose's port 8100 and can be overridden from the environment.
+# PINPOINT_REQUIRE_INTEGRATION=1 turns on the guard in mcp-server/tests/
+# conftest.py: a skipped test (or a run where nothing passed) fails the
+# command, so CI cannot go green without really running the five tools against
+# the API. The default is `-` not `:-` on purpose: an empty PINPOINT_BASE_URL
+# stays empty, the module skips, and the guard fails the run. See
+# docs/testing.md.
+mcp-integration:
+	cd mcp-server && uv sync --frozen && PINPOINT_BASE_URL="$${PINPOINT_BASE_URL-http://localhost:8100}" PINPOINT_REQUIRE_INTEGRATION=1 uv run pytest tests/test_integration.py -rs
 
 # Tests of the Claude Code hooks in agent-hooks/. Standard library only, so no
 # uv and no install: it uses whichever of python3 / python really runs Python

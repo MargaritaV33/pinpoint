@@ -88,6 +88,13 @@ jobs:
       - name: Run integration tests
         run: make integration
 
+      - name: Run MCP server integration test
+        # The five read-only MCP tools against the real API of the stack
+        # above (seeded demo account). The target fails if the test is
+        # skipped, so this cannot pass silently. A red run stops `deploy`
+        # like any other step of this job; see mcp-server/README.md.
+        run: make mcp-integration
+
       - name: Run end-to-end tests
         run: make e2e
 

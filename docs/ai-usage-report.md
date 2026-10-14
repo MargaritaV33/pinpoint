@@ -1459,3 +1459,41 @@ standard the project settled on only after being burned once.
   cleared by itself. The cause was never seen (no dashboard access), so it is
   unexplained rather than ruled out. The "production may be serving
   nothing" note above is no longer true.
+
+## 2026-10-14 — Issue #25: docs/deployment.md: add render_git_commit row and fix the 'does not deploy itself' wording
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. #25 was filed by the orchestrator from
+  QA's observations on #24, and the owner asked for it to be folded into
+  the next run as a small docs-only fix.
+- **PM input/output:** checked the draft against `render.yaml`,
+  `config.py`, `health.py`, `ci.yml` and `docs/release-process.md`. Both
+  draft criteria held (the table had 6 rows for 7 `Settings` fields; the
+  intro predates #13's `autoDeployTrigger: off` and the CI `deploy` job).
+  Added two more statements that are wrong now: the sentence after the
+  table ("every other variable relies on its documented default", which
+  stops being true once `RENDER_GIT_COMMIT`, injected by Render, has a
+  row) and the Rollback intro ("the only rollback mechanism", while
+  `release-process.md` documents two paths). Everything else in the file
+  was checked and left alone. Declined to widen into documenting the
+  GitHub secret and variable the `deploy` job needs, and left the Render
+  dashboard "Docker Command" check to the owner.
+- **Engineer input/output:** one commit, `d65bf14`, only
+  `docs/deployment.md` (15 insertions, 6 deletions): new intro wording, a
+  seventh table row, the reworded post-table paragraph and the Rollback
+  intro. Every added claim was mapped to a line in a named source file, with
+  no quoted line numbers or `CMD` in the doc.
+- **QA input/output (PASS):** re-derived every check instead of trusting the
+  Engineer: the two stale phrases no longer match, `git diff --stat` is one
+  file, headings and env rows 1 to 6, the Blueprint steps and the Rollback
+  steps are byte-identical to the parent commit, the table is 7 rows by 3
+  columns, and the heading links from `README.md` and
+  `docs/release-process.md` still resolve. The orchestrator closed the
+  issue.
+- **Review:** nothing rejected. QA flagged that one phrase in its own
+  comment about line widths was muddled and could not be edited because QA
+  posts exactly one comment; the numbers (77 characters before, 75 after) are
+  recorded here.
+- **Verification:** greps, diff, byte comparison. **Not verified:** CI
+  behaviour after the push (docs only), rendered Markdown, and the Render
+  dashboard (owner-only).

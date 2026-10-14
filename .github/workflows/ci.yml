@@ -107,3 +107,27 @@ jobs:
       - name: Tear down stack
         if: always()
         run: docker compose down -v
+
+  deploy:
+    needs: [stack]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Trigger Render deploy
+        run: curl --fail-with-body -sS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      - name: Wait for /health to report this commit
+        run: |
+          sha="${{ github.sha }}"
+          for i in $(seq 1 60); do
+            body="$(curl -fsS "${{ vars.PUBLIC_URL }}/health" || true)"
+            deployed="$(echo "$body" | jq -r '.commit // empty' 2>/dev/null || true)"
+            if [ "$deployed" = "$sha" ]; then
+              echo "Deployed commit $deployed matches $sha."
+              exit 0
+            fi
+            echo "Attempt $i/60: deployed commit is '${deployed:-<none>}', waiting for $sha..."
+            sleep 10
+          done
+          echo "Timed out after 10 minutes waiting for $sha to appear at ${{ vars.PUBLIC_URL }}/health"
+          exit 1

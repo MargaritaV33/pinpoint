@@ -32,6 +32,11 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    # Render's own push-triggered deploys are off (default would be
+    # `commit` — auto-deploy on every push). ci.yml's `deploy` job, gated
+    # on a green `stack` run on `main`, is the only deploy trigger now
+    # (issue #13).
+    autoDeployTrigger: off
     envVars:
       - key: JWT_SECRET
         generateValue: true

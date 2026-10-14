@@ -3,8 +3,13 @@
 Pinpoint deploys to [Render](https://render.com) as a Blueprint: one web
 service (the Dockerfile image already built and verified in #8/#9) plus one
 managed Postgres database, both described in root `render.yaml`. This repo
-does not deploy itself — a human with Render dashboard access applies the
-Blueprint once; see "Creating the Blueprint" below.
+turns Render's own push-triggered deploys off (`autoDeployTrigger: off`
+in `render.yaml`). Instead, the `deploy` job in `.github/workflows/ci.yml`
+calls Render's deploy hook after a green run on a push to `main` (it
+needs the `stack` job, and only runs when the ref is `main` and the event
+is a `push`). `docs/release-process.md` has the details. Creating the
+Blueprint is still a one-time step that a human with Render dashboard
+access does; see "Creating the Blueprint" below.
 
 ## Creating the Blueprint
 
@@ -47,11 +52,13 @@ One row per field in `backend/app/config.py`'s `Settings`:
 | `access_token_minutes` | `ACCESS_TOKEN_MINUTES` | Relies on its working default (`60`) — not set in `render.yaml`; already a reasonable production value. |
 | `cors_origins` | `CORS_ORIGINS` | Relies on its working default (the two local-dev origins) — not set in `render.yaml`; irrelevant in production because the frontend is served same-origin by this same image (issue #8), so no browser request ever needs a CORS allowance here. |
 | `max_upload_mb` | `MAX_UPLOAD_MB` | Relies on its working default (`15`) — not set in `render.yaml`; this is the product-spec limit itself. |
+| `render_git_commit` | `RENDER_GIT_COMMIT` | Injected by Render automatically on a real deploy, so it is not in `render.yaml`. It is unset (`None`) everywhere else — a local run, Compose, CI's test jobs. `/health` reports it as the `commit` field, which CI's `deploy` job polls to confirm the live service serves the commit that triggered the run. |
 
 Nothing in this deployment requires a human to type in a value:
 `JWT_SECRET` is generated, `DATABASE_URL` is wired from the attached
-database, `ENVIRONMENT` is a fixed literal in the file, and every other
-variable relies on its documented default.
+database, `ENVIRONMENT` is a fixed literal in the file, Render injects
+`RENDER_GIT_COMMIT` itself, and every other variable relies on its
+documented default.
 
 The frontend needs no runtime configuration either: `VITE_API_BASE_URL` is
 baked into the image at build time as `""` (same-origin), per the
@@ -60,8 +67,10 @@ all.
 
 ## Rollback
 
-Render's own UI is the only rollback mechanism this project uses — there is
-no CLI rollback on the free plan, and this project does not add one.
+Redeploying a previous deploy from Render's own UI is the fast rollback
+path, described below. The slower path, a `git revert` pushed through CI,
+is in `docs/release-process.md`. There is no CLI rollback on the free
+plan, and this project does not add one.
 
 To roll back: open the `pinpoint` web service, go to its **Deploys** tab,
 find a previous deploy marked successful, and use that deploy's

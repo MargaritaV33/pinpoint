@@ -17,7 +17,17 @@ the canonical and working-copy trees stay in sync.
 | Canonical/working-copy sync | `.agents/agents/`, `.agents/skills/` (canonical) kept aligned with `.claude/agents/`, `.claude/skills/` (working copy) via root `Makefile` and `scripts/check-agents-sync.sh` | Run `make sync-agents`, then `bash scripts/check-agents-sync.sh` | Copies canonical subagent/skill files into the tree Claude Code actually loads, and fails CI's `agents-sync` job if the two trees ever drift apart |
 | `MCP server` | `mcp-server/`, `.mcp.json` | The `pinpoint` MCP server in Claude Code (start Claude Code in the repo root and approve it once), or `uv run --directory mcp-server pinpoint-mcp` | Read-only room, pin and approval queries against a running Pinpoint (`health`, `list_rooms`, `room_summary`, `open_pins`, `approve_status`); see `mcp-server/README.md` |
 
+| Hook / guardrail | `agent-hooks/` (`pretool_bash_guard.py`, `posttool_test_reminder.py`, `run.sh`), wired in `.claude/settings.json` | Automatic in Claude Code once the repo is opened (hooks load at session start); test with `make hooks-test` | A PreToolUse hook that blocks force pushes to `main`, shell writes to `_local/`, printing or writing real `.env` files, `rm -rf` outside the repo and calls to the Render deploy hook; a PostToolUse hook that reminds the agent to run `make test` / `make frontend-test` after an edit under `backend/` / `frontend/`. A guardrail against accidents, not a security boundary; see `agent-hooks/README.md` |
+| Permission notes | `docs/permissions.md` | Read it; it is not executable | What an agent may do alone, what needs the repo owner, which limits a hook enforces, which secrets exist (names only), and what the hooks cannot enforce |
+| Custom-agent reference | `custom-agent/README.md` (the agent itself stays in `.agents/agents/on-call-responder.md` and `.claude/agents/on-call-responder.md`) | Launch the `on-call-responder` subagent by name, or the headless command in that README | How to launch and constrain `on-call-responder`, plus a real run against the issue #12 incident compared with what actually happened |
+
 Later issues extend this table as new subagents and skills are added.
+
+The six items of the course's extension-pack criterion map to this table:
+project instructions (`AGENTS.md` and `CLAUDE.md`), reusable workflow and
+skills (`implement-issue`, `release` and `incident-response`), a custom subagent (`on-call-responder`,
+referenced from `custom-agent/`), an MCP server (`mcp-server/`), a hook and
+guardrail (`agent-hooks/`) and permission notes (`docs/permissions.md`).
 
 ## MCP server
 

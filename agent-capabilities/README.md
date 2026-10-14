@@ -36,3 +36,12 @@ Windows, where symlinks are unreliable without extra privileges.
 Workflow: edit under `.agents/`, run `make sync-agents`, then
 `bash scripts/check-agents-sync.sh` to confirm the trees match before
 committing.
+
+## What is not synced
+
+`.claude/settings.json` (which wires the hooks) and `agent-hooks/` are not part
+of either tree: `make sync-agents` only removes and re-copies `.claude/agents`
+and `.claude/skills`, so it never touches them. The hooks are described in
+`agent-hooks/README.md`; what agents may do alone is in `docs/permissions.md`;
+`custom-agent/README.md` references the `on-call-responder` subagent that lives
+in the trees above.

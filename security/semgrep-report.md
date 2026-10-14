@@ -25,6 +25,16 @@ real ERROR is tracked in #30. Semgrep labels the two
 `uv-missing-dependency-cooldown` rows `MEDIUM`, not WARNING; neither is `ERROR`,
 so neither gates.
 
+## Re-run at the end of issue #26
+
+After the application fixes, the audits and the other four documents were
+committed, the scan was run again on an export of commit `d147808` (the last
+commit before this paragraph): **the same 19 findings** (same rule, file and
+line, compared programmatically), 238 files scanned (232 plus the six files of
+`security/`), and the exact CI gate command exited **0**. The committed
+`semgrep.json` is therefore still the current result; the fixes of this issue
+did not touch a line any finding points at.
+
 ## How to reproduce
 
 Pinned image: `semgrep/semgrep:1.180.0` (digest
@@ -239,9 +249,9 @@ grep -nE 'render[.]com/deploy|RENDER_DEPLOY_HOOK_URL[=]|[e]yJ|BEGIN [A-Z ]*PRIVA
 grep -nE 'C:\Users|/[c]/Users|[/]Users[/]' semgrep.json semgrep-report.md dependency-audit.md pr-audit.md
 ```
 
-Result: no output from either command (grep exit status 1 = no match), over all
-five files of `security/` that exist at the final commit. Re-run at the final
-commit after the last edit; see the issue comment for the final result.
+Result: no output from either command (grep exit status 1 = no match), over every
+file in `security/` (the JSON, the five documents and the helper script),
+re-run after the last edit of those files.
 
 Redaction of `p/secrets` matched text: **not needed**, and not done. There were
 0 `p/secrets` findings, and every `extra.lines` value in the JSON is the literal

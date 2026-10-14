@@ -22,8 +22,9 @@ Blueprint once; see "Creating the Blueprint" below.
 No other dashboard configuration is needed: every environment variable the
 app requires is either generated, wired from the attached database, or
 relies on a working default (see the table below), and no build command,
-pre-deploy command, or extra service is required — `render.yaml`'s
-`dockerCommand` is the only command Render runs.
+pre-deploy command, or extra service is required. `render.yaml` sets no
+command override, so the only command Render runs is the Dockerfile's own
+`CMD`.
 
 ### No migration step
 
@@ -40,7 +41,7 @@ One row per field in `backend/app/config.py`'s `Settings`:
 
 | Setting | Render var | How it's set |
 |---|---|---|
-| `database_url` | `DATABASE_URL` | Set automatically by the blueprint — wired via `fromDatabase` to the `pinpoint-db` database's `connectionString`, with the scheme rewritten from `postgresql://` to `postgresql+psycopg://` inside `dockerCommand` (see the comment at the top of `render.yaml`: this backend installs `psycopg[binary]`, not `psycopg2`). |
+| `database_url` | `DATABASE_URL` | Set automatically by the blueprint — wired via `fromDatabase` to the `pinpoint-db` database's `connectionString`. Render supplies a bare `postgres://` or `postgresql://` URL; `Settings._normalize_database_url` (a `field_validator` on `database_url` in `backend/app/config.py`) rewrites either form to `postgresql+psycopg://`, because this backend installs `psycopg[binary]`, not `psycopg2`. `render.yaml` does no rewriting. `sqlite:///...` and already-qualified `postgresql+psycopg://...` URLs pass through unchanged. |
 | `jwt_secret` | `JWT_SECRET` | Set automatically by the blueprint — `generateValue: true`, a random value Render generates and stores; never Compose's local-dev default. |
 | `environment` | `ENVIRONMENT` | A fixed literal, `production`, written directly in `render.yaml`. It is a free-form label read nowhere else in the codebase, so a literal is safe. |
 | `access_token_minutes` | `ACCESS_TOKEN_MINUTES` | Relies on its working default (`60`) — not set in `render.yaml`; already a reasonable production value. |

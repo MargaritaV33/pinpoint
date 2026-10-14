@@ -513,3 +513,56 @@ verified. Consolidated into a narrative before submission.
   reverted; `make test` 81 passed, `make frontend-test` 51 passed, `npm run
   build` succeeds. QA verdict: PASS. Orchestrator closed issue #10 and
   pushed both commits to `main`.
+
+## 2026-10-14 — Issue #11: CI pipeline
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer (two passes, one
+  blocked on a scope decision) + QA, each a fresh session per
+  `_docs/process.md`. First issue where the engineer pushed directly to
+  `main` mid-work (twice), since verifying a GitHub Actions workflow is
+  only possible by actually triggering a run on GitHub's own
+  infrastructure — pre-authorized by the orchestrator for this issue only,
+  not a change to the project's normal push discipline.
+- **PM input/output:** made two explicit design calls instead of leaving
+  them for the engineer to improvise: a matrix for the backend job's two
+  database legs (so a Postgres-only failure shows as its own distinct
+  check rather than hiding behind a single `backend` red/green), and
+  reusing the existing `make e2e` script for the stack job's Playwright
+  step rather than calling Playwright directly — correctly predicting that
+  `run.mjs`'s own stack-detection would no-op cleanly once the `stack`
+  job's `docker compose up --wait` had already brought the stack up.
+  Scoped the "fix what only breaks on GitHub's runners" allowance
+  narrowly and explicitly, which is exactly what let the engineer
+  recognize the later TypeScript failure as outside that allowance rather
+  than quietly folding it in.
+- **Engineer input/output:** got the workflow running on a real push and
+  hit a genuine blocker on the first try — wiring `tsc --noEmit` into CI
+  for the first time surfaced pre-existing type errors in four frontend
+  test files, which reproduced identically on a local run too (not a
+  Linux-runner quirk). Correctly recognized this as outside the issue's
+  own pre-approved allowance and stopped to ask rather than either
+  silently fixing it or silently ignoring it — a real scope decision that
+  was the repo owner's to make, not the agent's. On approval, fixed the
+  four files with non-null assertions and a properly-typed test fake,
+  verified the fix changed no actual assertion, and pushed again to a
+  fully green run exercising every job including a live `docker compose
+  build`/`up`, `make integration`, and a fresh Chromium download for
+  `make e2e`.
+- **Review:** QA didn't just trust the "green run" claim — it pulled the
+  actual job logs from both GitHub Actions runs via the API, confirmed the
+  first run's failure log contained the exact 10 error lines the engineer
+  named, and confirmed the second run's `stack` job log showed genuine
+  pytest/Playwright output (not a cache hit or a skip) — real `collected N
+  items`/`N passed` lines and a live Chromium download progress bar. Also
+  fetched the live README badge's SVG directly and checked its text
+  content said "passing," rather than trusting the markdown's presence.
+- **Verification:** Real GitHub Actions run
+  https://github.com/MargaritaV33/pinpoint/actions/runs/38536296305 — all
+  4 jobs (`backend (sqlite)`, `backend (postgres)`, `frontend`, `stack`)
+  green, independently confirmed via job logs by QA. Local:
+  `npx tsc --noEmit` clean, `make frontend-test` 51/51. QA verdict: PASS.
+  Orchestrator restored a local lockfile drift from QA's own `npm install`
+  (the known issue #9 reversion risk, harmless and already documented),
+  closed issue #11 — both commits (`d93f8cd`, `4c94587`) were already on
+  `origin/main` from the engineer's required mid-work pushes, so nothing
+  further needed pushing.

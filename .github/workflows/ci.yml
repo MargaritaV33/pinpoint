@@ -140,6 +140,33 @@ jobs:
         working-directory: mcp-server
         run: uv run pytest -rs
 
+  hooks:
+    # Tests of the Claude Code hooks in agent-hooks/ (standard library only: no
+    # uv, no install). Deliberately not in `stack.needs` or `deploy.needs`:
+    # like agents-sync and mcp, it checks something the deployed image does not
+    # contain, so a red hooks cannot change what ships, yet it still shows as a
+    # failing check on the commit. Gating the deploy on it is a one-line change
+    # to deploy.needs and is the owner's decision.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run hook tests
+        run: python -m unittest discover -s agent-hooks/tests -v
+
+      - name: Smoke-test the launcher itself (sh run.sh), not only python
+        run: |
+          deny='{"tool_name":"Bash","tool_input":{"command":"git push --force origin main"},"cwd":"."}'
+          allow='{"tool_name":"Bash","tool_input":{"command":"git status"},"cwd":"."}'
+          code=0
+          echo "$deny" | sh agent-hooks/run.sh pretool_bash_guard.py || code=$?
+          test "$code" -eq 2 || { echo "expected exit 2 for the force push, got $code"; exit 1; }
+          echo "$allow" | sh agent-hooks/run.sh pretool_bash_guard.py
+
   deploy:
     needs: [stack]
     runs-on: ubuntu-latest

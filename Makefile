@@ -1,4 +1,4 @@
-.PHONY: sync run test frontend-test up down integration e2e sync-agents mcp-test
+.PHONY: sync run test frontend-test up down integration e2e sync-agents mcp-test hooks-test
 
 sync:
 	cd backend && uv sync
@@ -48,3 +48,14 @@ sync-agents:
 # is skipped unless PINPOINT_BASE_URL is set; see mcp-server/README.md.
 mcp-test:
 	cd mcp-server && uv run pytest
+
+# Tests of the Claude Code hooks in agent-hooks/. Standard library only, so no
+# uv and no install: it uses whichever of python3 / python really runs Python
+# 3.8+ (the same probe as agent-hooks/run.sh, which skips the Windows Store
+# python3 stub). See agent-hooks/README.md.
+hooks-test:
+	@py=; for c in python3 python; do \
+	  if $$c -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" >/dev/null 2>&1; then py=$$c; break; fi; \
+	done; \
+	if [ -z "$$py" ]; then echo "hooks-test: no working Python 3.8+ (tried python3, python)"; exit 1; fi; \
+	$$py -m unittest discover -s agent-hooks/tests -v

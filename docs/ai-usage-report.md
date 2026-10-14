@@ -1434,3 +1434,21 @@ standard the project settled on only after being burned once.
   `uv` itself, anything in GitHub Actions, `make test`, `make
   frontend-test` and `make integration` (nothing in backend, frontend or
   the API changed).
+- **CI-side proof (criterion 9, orchestrator):** CI run 38623992537 on
+  `88d9dd7`. In the `stack` job the new step ran after "Run integration
+  tests" and before "Run end-to-end tests": `cd mcp-server && uv sync
+  --frozen && PINPOINT_BASE_URL=... PINPOINT_REQUIRE_INTEGRATION=1 uv run
+  pytest tests/test_integration.py -rs` gave `tests/test_integration.py
+  ......  6 passed in 0.50s`, nothing skipped. `stack` was green. The `mcp`
+  job was green with the module still skipped (`51 passed, 6 skipped`).
+  That closes the "uv and the runner's Python are unverified" gap above.
+  Orchestrator closed the issue after recording this.
+- **Deploy did not go out for this batch (not caused by it):** the same run's
+  `deploy` job failed in "Trigger Render deploy" with `curl: (22) The
+  requested URL returned error: 500`, and failed again on a single re-run
+  of that job. The live `/health` returned `502` on every one of four
+  checks over about two minutes. Nothing in this batch touches that step
+  (the previous push, #22, deployed fine), and all other jobs were green.
+  Render's dashboard is owner-only, so the cause is unconfirmed: it needs the
+  `pinpoint` service's Events and Logs tabs. Production may be serving
+  nothing right now; see the batch summary.

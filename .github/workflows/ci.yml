@@ -116,6 +116,30 @@ jobs:
       - name: Check .agents/ and .claude/ are in sync
         run: bash scripts/check-agents-sync.sh
 
+  mcp:
+    # Unit tests of mcp-server/ (HTTP mocked with respx). Deliberately not in
+    # `stack.needs` or `deploy.needs`: like agents-sync, it checks something
+    # the deployed image does not contain (the Dockerfile copies only backend/,
+    # frontend/ and openapi.yaml), so a red mcp cannot change what ships, yet
+    # it still shows as a failing check on the commit. Gating the deploy on it
+    # is a one-line change to deploy.needs and is the owner's decision.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install MCP server dependencies
+        run: cd mcp-server && uv sync --frozen
+
+      - name: Run MCP server tests
+        working-directory: mcp-server
+        run: uv run pytest -rs
+
   deploy:
     needs: [stack]
     runs-on: ubuntu-latest

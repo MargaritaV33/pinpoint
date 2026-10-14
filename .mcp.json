@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "pinpoint": {
+      "command": "uv",
+      "args": ["run", "--directory", "mcp-server", "pinpoint-mcp"],
+      "env": {
+        "PINPOINT_BASE_URL": "${PINPOINT_BASE_URL:-http://localhost:8100}",
+        "PINPOINT_TOKEN": "${PINPOINT_TOKEN:-}",
+        "PINPOINT_EMAIL": "${PINPOINT_EMAIL:-}",
+        "PINPOINT_PASSWORD": "${PINPOINT_PASSWORD:-}"
+      }
+    }
+  }
+}

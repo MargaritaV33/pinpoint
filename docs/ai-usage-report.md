@@ -1297,3 +1297,46 @@ standard the project settled on only after being burned once.
   3.13, `cp` over an existing real `.env` (deliberately not exercised, the
   overwrite risk is documented, not tested), and the Edit, Write and
   PowerShell paths to `.env`, which are unhooked.
+
+## 2026-10-14 — Issue #24: Fix stale dockerCommand references in docs/deployment.md
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. Raw scope came from the owner's batch
+  brief ("fix the stale dockerCommand references, lines ~26 and ~43, docs
+  only"); the orchestrator created #24 and left the shaping to the PM.
+- **PM input/output:** read all of `docs/deployment.md`, `render.yaml`,
+  `Settings._normalize_database_url` and its four tests, the Dockerfile
+  `CMD` and issue #12's fix comments. Found exactly the two stale
+  statements (the "only command Render runs" paragraph and the
+  `database_url` table row) and that the other sections, including "No
+  migration step", are still true. Caught that #12's comments quote a
+  `uv run uvicorn` `CMD` that issue #17 later replaced with the venv's
+  `uvicorn` in exec form, so the criteria forbid copying #12's wording and
+  say to refer to "the Dockerfile's own `CMD`" without quoting it. The
+  checks are greps (`dockerCommand` and `uv run` must not appear in the
+  doc) plus a one-file `git diff --stat`. `custom-agent/README.md` and this
+  report quote the old lines as history and stay unchanged. Raised, not
+  fixed: line 7 ("does not deploy itself") reads oddly next to the CI
+  `deploy` job, and a stale "Docker Command" value could still sit in the
+  Render dashboard.
+- **Engineer input/output:** commit `cefbfdc`, one file, 4 insertions and 3
+  deletions. The paragraph now says `render.yaml` sets no command override
+  and Render runs only the Dockerfile's own `CMD`; the `database_url` row
+  says `fromDatabase` wires the connection string, that
+  `Settings._normalize_database_url` in `config.py` rewrites bare
+  `postgres://` and `postgresql://` to `postgresql+psycopg://`, that
+  `render.yaml` does no rewriting, and that `sqlite:///` and already
+  qualified URLs pass through. It mapped each claim to a line in
+  `render.yaml`, `config.py`, the tests and the Dockerfile.
+- **QA input/output (PASS):** re-ran the greps and the diff stat, checked
+  every claim against the sources, ran `tests/test_config.py` for real (4
+  passed), and checked the preserved headings and table shape. Noted, not
+  failed: the intro "One row per field in `Settings`" still lacks a row for
+  `render_git_commit`, and the "does not deploy itself" wording. The
+  orchestrator closed the issue.
+- **Review:** nothing rejected. The two QA observations were out of the
+  issue's scope (the owner said docs only, about `dockerCommand`), so they
+  were filed as a follow-up issue instead of widened into this one.
+- **Verification:** greps, diff stat, 4 config tests. **Not verified:**
+  rendered Markdown, whether the Render dashboard still holds a stale
+  "Docker Command" value (an owner check), the full suite (docs-only).

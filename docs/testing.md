@@ -1,7 +1,9 @@
 # Testing
 
-Four suites, each exercising a different layer. Run them in this order when
-in doubt: backend unit → frontend unit → integration → end-to-end.
+Five suites, each exercising a different layer. Run them in this order when
+in doubt: backend unit → frontend unit → integration → MCP integration →
+end-to-end. (`make mcp-test`, the MCP server's mocked unit tests, needs
+nothing running and is not counted as a suite here.)
 
 ## Backend unit
 
@@ -90,6 +92,32 @@ The base URL defaults to `http://localhost:8100` (matching
 `make integration` fails within a few seconds with a readable
 connection-refused error (the `httpx` client's 5-second timeout) rather
 than hanging.
+
+## MCP integration
+
+`mcp-server/tests/test_integration.py` runs the five read-only tools of the MCP
+server (`health`, `list_rooms`, `room_summary`, `open_pins`, `approve_status`)
+against the real API of the Compose stack, logging in as the seeded demo
+account. It asserts the seed exactly (`r_lakeside` with 2 open pins,
+`r_atrium` approved by Jonas Berg), so use a fresh `make up` rather than a
+stack that was changed by hand.
+
+Like `make integration`, it never starts the stack itself:
+
+```
+make up
+make mcp-integration
+```
+
+It differs from `make mcp-test`, which runs the 51 mocked unit tests with no
+stack and reports this module as skipped. `make mcp-integration` runs only
+this module, with `PINPOINT_BASE_URL` defaulting to `http://localhost:8100`
+(override it from the environment), and **fails if the test is skipped** or
+if nothing passed (it sets `PINPOINT_REQUIRE_INTEGRATION=1`, read by
+`mcp-server/tests/conftest.py`). An empty `PINPOINT_BASE_URL` therefore
+exits non-zero with a message naming that variable instead of going green.
+CI runs it as a step of the `stack` job, after `make integration` and before
+`make e2e`, so a red run there stops `deploy`.
 
 ## End-to-end
 

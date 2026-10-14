@@ -163,6 +163,7 @@ accordingly. Not tested here.
 ```bash
 make mcp-test                        # from the repo root; same as: cd mcp-server && uv run pytest
 cd mcp-server && uv run pytest -rs   # -rs shows why the integration test was skipped
+make mcp-integration                 # integration test only, against a running stack (`make up`); a skip fails it
 ```
 
 The unit tests mock HTTP with `respx` and need no backend, no network and no
@@ -180,9 +181,17 @@ with a reason) unless `PINPOINT_BASE_URL` is set:
 
 ```bash
 make up
-cd mcp-server && PINPOINT_BASE_URL=http://localhost:8100 uv run pytest tests/test_integration.py -v
+make mcp-integration     # uv sync --frozen, then only this module, PINPOINT_BASE_URL defaulting to http://localhost:8100
 make down
 ```
+
+`make mcp-integration` is also what CI runs. It sets
+`PINPOINT_REQUIRE_INTEGRATION=1`, which makes `tests/conftest.py` count a skipped
+test, or a run in which nothing passed, as a failure (exit non-zero, with a message
+naming `PINPOINT_BASE_URL`). Without that variable pytest behaves exactly as before,
+so `make mcp-test` and the `mcp` job still show the module as skipped. To run the
+module by hand instead:
+`cd mcp-server && PINPOINT_BASE_URL=http://localhost:8100 uv run pytest tests/test_integration.py -v`.
 
 It uses `PINPOINT_EMAIL` / `PINPOINT_PASSWORD` if set, else the seeded demo
 account, and ignores `PINPOINT_TOKEN` so that it exercises the login path. It
@@ -195,10 +204,16 @@ requests plus the login POST were issued.
 
 `.github/workflows/ci.yml` has an `mcp` job: Python 3.12 and uv exactly as the
 `backend` job, `uv sync --frozen`, `uv run pytest -rs`. No Postgres, no Docker,
-no `needs`. The integration test shows as skipped in its log. Running it against
-the Compose stack in CI is tracked separately (#21).
+no `needs`. The integration test shows as skipped in its log.
 
-`mcp` is deliberately **not** in `stack.needs` or `deploy.needs`. Like
+The integration test runs, and must pass, in the `stack` job: a step after "Run
+integration tests" runs `make mcp-integration` against the Compose stack that job
+already brought up. It fails if the test is skipped. Because that step is inside
+`stack`, a red MCP integration test stops `deploy` like any other `stack` failure,
+even though `mcp-server/` is not in the deployed image; it checks the real API
+contract that the tools depend on.
+
+The `mcp` job itself is deliberately **not** in `stack.needs` or `deploy.needs`. Like
 `agents-sync` (#18) it checks something that is not in the deployed image (the
 `Dockerfile` copies only `backend/`, `frontend/` and `openapi.yaml`), so a red
 `mcp` cannot change what ships, and it still shows as a failing check on the

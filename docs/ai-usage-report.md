@@ -1224,3 +1224,8 @@ standard the project settled on only after being burned once.
   machine's PATH. **Follow-ups:** `docs/deployment.md` lines 26 and 43
   still describe the removed `dockerCommand`; the env-file rule's false
   positives may need loosening if they get in the way.
+- **After the push:** CI run 38615036442 on `ac7c85a` was green, including
+  the new `hooks` job on Linux (so the guard and its 52 tests pass on a
+  non-Windows interpreter) and `deploy`. This closes the "hooks job not seen
+  green" gap above. Python 3.8 to 3.13 and a local Linux run remain
+  unchecked.

@@ -1229,3 +1229,32 @@ standard the project settled on only after being burned once.
   non-Windows interpreter) and `deploy`. This closes the "hooks job not seen
   green" gap above. Python 3.8 to 3.13 and a local Linux run remain
   unchecked.
+
+## 2026-10-14 — Issue #23: Loosen the .env guard: allow .env.example and mentions of .env
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. The owner's follow-up brief to #22 had no
+  issue behind it, so the orchestrator created #23 with that text as raw
+  scope and left the shaping to the PM.
+- **PM input/output:** read the guard, its tests, the hooks README,
+  `docs/permissions.md` and the QA and Engineer comments on #22, and
+  rewrote the issue around the seven real false positives (`grep -rn ".env"
+  docs`, `ls -a | grep -E '^\.env'`, `find . -name ".env*"`, `cp
+  .env.example .env.example.bak`, `cat .env.example.bak`, a quoted `.env`
+  word in a `for` loop, and `cp .env.example .env`). Decided that a `cp`
+  from a template onto exactly `.env` is the only permitted write to `.env`
+  (`cat .env.example > .env`, `mv`, `tee`, `sed -i` and `cp .env .env.bak`
+  stay denied), how template names and backup suffixes are recognised, and
+  that grep patterns, `find -name` patterns, `for` word lists and `echo`
+  operands are harmless mentions while `find -exec`, `grep -f .env` and
+  `--include=".env*"` stay denied. The one existing deny case that flips on
+  purpose is named. Required a row in `_docs/decisions.md` (the #22 spec
+  said to deny `cp` into `.env`, and a later session would re-implement
+  that from `docs/` alone), the `docs/permissions.md` and README wording,
+  and `make hooks-test` without `uv`. Parked a no-clobber check and
+  readers that do not name the file in `_local/make-it-better.md`. The
+  orchestrator reviewed the open questions and kept the PM's defaults: the
+  silent overwrite of an existing `.env` by the owner's own README command
+  is accepted and documented, because the owner said that exact command must
+  pass, and the `_docs/decisions.md` row is covered by the owner's
+  correction, which `AGENTS.md` says to record in `_docs/`.

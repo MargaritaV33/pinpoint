@@ -1497,3 +1497,89 @@ standard the project settled on only after being burned once.
 - **Verification:** greps, diff, byte comparison. **Not verified:** CI
   behaviour after the push (docs only), rendered Markdown, and the Render
   dashboard (owner-only).
+
+## 2026-10-14 — Issue #26: Security scan, PR audit and AI tool/data policy
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. The owner's brief (rubric criterion 13,
+  five deliverables under `security/`) arrived with no issue behind it; the
+  orchestrator created #26 with that text as raw scope plus repo facts and
+  flags, and left the shaping to the PM.
+- **PM input/output:** checked the brief against `git log`, the thread of
+  #16 and the code, and rewrote the issue into criteria D1 to D5 plus
+  delivery hygiene. Two findings changed the brief. First, #16 contains no
+  auth, image serving or upload code (its commits `e80988c`, `c15f635`,
+  `400a48a`, `02cf7c2` are the sign-up toggle, an authenticated image fetch
+  on the client, a README note and a log entry), so the audit targets #4's
+  `220f89a` (`backend/app/auth/*`, the routers, config, CORS, `ids.py`) plus
+  #16's client side, and must say why; there is no PR in this repo, so it is
+  a commit-range audit. Second, mounting the working tree into the
+  third-party Semgrep image would expose `.env` and `_local/`, so the scan
+  runs on a read-only `git archive` export of tracked files with metrics off
+  and a pinned tag. The criteria also covered: PowerShell 5.1 corrupting
+  binary pipes, redaction of `p/secrets` matches in a public repo, "new
+  findings" defined as inline `nosemgrep` with a reason and no baseline
+  file, the gate proven red and green, `pip-audit` without `uv` (runtime
+  closure derived from `uv.lock`), never running `npm audit fix`, a
+  one-hour time-box for fixes that excludes schema, endpoint and lockfile
+  changes, and honesty in the policy: "QA agent + human review for
+  deploy-affecting changes" is stated as not enforced today (agents may push
+  to `main`, `main` is unprotected, no CODEOWNERS), with owner-only
+  follow-ups. It also flagged a conflict between "agents never see
+  `_local/`" and `docs/permissions.md`, which lets agents read it. It
+  created follow-ups #27 (does `security` gate `deploy`), #28 (branch
+  protection, CODEOWNERS) and #29 (scheduled dependency audits in CI).
+- **Orchestrator decisions:** accepted the PM's defaults for the open
+  questions (demo data accepted as documented, no extra rulesets,
+  `semgrep.json` committed with `p/secrets` text redacted, `_local/` rule
+  documented and left for the owner). Told the owner about both deviations
+  from the brief.
+- **Engineer input/output:** 15 commits. D1: Semgrep 1.180.0 on an export of
+  232 files gave 19 findings (1 ERROR: the Dockerfile has no `USER`; 2
+  MEDIUM: a uv cooldown hint in two `pyproject.toml` files; 16 WARNING:
+  mutable GitHub Actions tags), none from `p/secrets` and none in
+  application code; `pip-audit` on 29 runtime packages (38 in the whole
+  lock) and `npm audit --omit=dev` found nothing; every Semgrep row has a
+  disposition. D2: a `security` job with the same pinned image, a report
+  step and a gate step (`--severity ERROR --error`, no `|| true`),
+  `deploy.needs` unchanged; the gate gave exit 0 on the tree and 1 on a
+  scratch copy with a flagged JWT snippet. Because the Dockerfile is outside
+  the issue's whitelist, the ERROR cannot be fixed here, so the gate step
+  carries `--exclude-rule` for it, documented in `ci.yml` and the report and
+  removed by #30. D3: 16 findings (0 Critical or High, 3 Medium, 9 Low, 4
+  Info), every `file:line` checked with `git show`. Four fixed with
+  regression tests: the studio image route sent `Cache-Control: public`
+  (now `private`, contract commit first), `nosniff` on both image routes,
+  128-bit guest tokens for new rooms, and refusing to start under
+  `ENVIRONMENT=production` with the public default JWT secret. Two tests pin
+  behaviour that was already correct (SPA path traversal, a forged JWT with
+  no session row). Follow-ups #30 to #37 were filed for the rest (Dockerfile
+  root user, action SHA pinning, rate limiting on `/auth/*`, hashing session
+  tokens, upload byte checks, the studio token in `localStorage`, agent
+  tool scoping, `_local/` in `.dockerignore`). D4 and D5: the
+  agent-extension risk document and the AI tool and data policy, plus one
+  link line each in `README.md` and `docs/agent-extension-pack.md`.
+- **Review:** the Engineer rated the default JWT secret Low rather than High
+  after confirming a forged token is rejected without a session row; rejected
+  magic-byte upload validation as a quick fix because `integration/` uploads
+  placeholder bytes (so #34); corrected its own commit message after a
+  mutation test showed the session check exists twice; rejected editing the
+  Dockerfile or `.dockerignore` (off the whitelist). The expected
+  `dangerouslySetInnerHTML` candidate was checked by hand: unused generated
+  UI. QA found its way to three minor defects, none failing: one cosmetic
+  wrong line reference (`mcp-server/README.md:24` should be 22), commit
+  order, and no `paths.skipped` in the JSON (explained in the report).
+- **QA input/output (PASS, CI job pending):** re-ran Semgrep in both Git Bash
+  and PowerShell (19 findings, identical to the JSON and the report),
+  re-derived the 29-package closure and ran `pip-audit` and `npm audit`
+  (0 findings), proved the gate on scratch copies (exit 0 on the tree, 1
+  without the exclusion, 1 with a flagged snippet, 0 with an inline
+  `nosemgrep`), checked 14 audit findings against their commits, built
+  pre-fix copies to show each regression test fails before the fix and
+  passes after, checked the app diff for production risk (the new startup
+  refusal cannot hit Compose, which defaults to `development`, or Render,
+  which generates `JWT_SECRET`), and confirmed `main` is unprotected via the
+  API. Backend 98 passed, frontend 51, mcp-server 51 passed and 6 skipped.
+- **Verification:** commands above. **Not verified before the push:** the
+  CI `security` job, `make integration`, `make mcp-test` and `make e2e`
+  (no `uv` here), and production behaviour after the deploy (checked below).

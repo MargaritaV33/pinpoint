@@ -57,7 +57,7 @@ def test_health_contract_matches_the_endpoint() -> None:
     assert operation["operationId"] == "getHealth"
     # `security: []` opts out of the top-level bearerAuth: CI's curl and the
     # MCP health() tool call /health without a token.
-    assert operation["security"] == []
+    assert operation.get("security") == []
     assert operation["tags"] == ["Health"]
 
     ref = operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
@@ -70,4 +70,4 @@ def test_health_contract_matches_the_endpoint() -> None:
 
     assert properties["status"]["enum"] == ["ok"]
     assert properties["commit"]["type"] == "string"
-    assert properties["commit"]["nullable"] is True
+    assert properties["commit"].get("nullable") is True

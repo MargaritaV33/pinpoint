@@ -1041,3 +1041,65 @@ standard the project settled on only after being burned once.
   gate; no symlinks anywhere; only the 20 files the issue's constraints
   allowed were touched. QA verdict: PASS. Orchestrator closed issue #18
   and pushed `8d69e70` to `main`.
+
+## 2026-10-14 — Issue #19: Pinpoint MCP server
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. The repository owner's brief arrived as
+  a single paragraph with no issue behind it, so the orchestrator first
+  created #19 with that text as the raw scope and left all shaping to the
+  PM.
+- **PM input/output:** grounded the brief against the real code before
+  writing criteria, and resolved the places where it did not match the
+  API. There is no approve-status endpoint, so `approve_status` is derived
+  from `status`/`approvedAt`/`approvedBy` on `GET /rooms/{id}` with no
+  contract change. "Read-only" collides with email/password login, so the
+  GET-only test allows exactly one exception, `POST /auth/login`, which
+  creates a session and no data. `guestToken` in the `/rooms` payload lets
+  its holder act as the client, so no tool may emit it. Studio tokens last
+  60 minutes, so a single re-login on a self-caused 401 was added. Port
+  8100 was confirmed for Compose, with a note that `make run` listens on
+  8091 and `openapi.yaml`'s first server says 8000. Decided the `mcp` CI
+  job stays out of `deploy.needs`, following the `agents-sync` precedent
+  from #18 (the Dockerfile ships none of `mcp-server/`). Wrote the
+  live-demo criterion so it cannot be satisfied by invention: a verbatim
+  transcript, or a marked TODO and a QA FAIL. Side effects, not part of
+  the brief: it filed #20 (`GET /health` is missing from `openapi.yaml`)
+  and #21 (run the MCP integration test in the CI stack job), and added
+  two rows to the gitignored `_local/make-it-better.md`. I reviewed the
+  extra issues as out-of-scope follow-ups, not as scope creep in #19.
+- **Engineer input/output:** built `mcp-server/` (client with auth and
+  error mapping, five `readOnlyHint` tools, 51 respx-mocked tests plus a
+  stdio protocol test and a 6-test integration module skipped unless
+  `PINPOINT_BASE_URL` is set), `.mcp.json`, `make mcp-test`, the `mcp` CI
+  job, and the docs, in five commits. Rejected an unpinned `mcp`: `uv add`
+  resolved 2.3.0, which renamed FastMCP, so it pinned `>=1.12,<2` (locked
+  1.30.0) and explained why in the commit and README. One of its own tests
+  caught a real leak, the client dataclass `repr` included the password
+  and token, fixed with `repr=False`. It captured the demo transcript from
+  a real headless `claude -p` session against `make up`, needing
+  `--settings enabledMcpjsonServers` because the project server was
+  pending approval, and rendered it with a script that only lays events
+  out. It noticed it had briefly passed the demo password as a redaction
+  pattern, which also redacted the server name, and re-rendered. It did
+  not push, so the throwaway-red CI criterion was left unverified.
+- **Review:** QA re-ran everything from fresh clones rather than trusting
+  the engineer, and re-ran the demo question itself in a new headless
+  session, getting the same tool-call sequence and the same answer
+  (Lakeside 1, Atrium 0). It checked the two pasted transcripts are
+  byte-identical and read the render script for rewriting. It exercised the
+  server through a real MCP stdio client and with a closed port. It also
+  confirmed no forbidden file changed and that all commits carry no
+  trailers. It declined to push to prove the CI criterion, since a push
+  to `main` deploys to production and nobody had authorised that, and
+  instead showed a deliberately broken test fails the job's exact
+  commands, then reverted it. It marked that line "verified locally only".
+  Non-blocking finding: `server.py` imports `pydantic` without declaring
+  it, which only works transitively through `mcp`.
+- **Verification:** `make mcp-test` 51 passed / 6 skipped; the integration
+  module against `make up` 6 passed; `make test` 86, `make frontend-test`
+  51, `make integration` 14 + 1, `make e2e` 2, agents-sync clean. QA
+  verdict: PASS, with one gap stated openly: the CI `mcp` job has not run
+  on GitHub. Orchestrator closed #19 on that basis. It did not push; the
+  five commits are on local `main` only, and the first push or a PR should
+  confirm the job.

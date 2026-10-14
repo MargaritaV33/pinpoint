@@ -1103,3 +1103,36 @@ standard the project settled on only after being burned once.
   on GitHub. Orchestrator closed #19 on that basis. It did not push; the
   five commits are on local `main` only, and the first push or a PR should
   confirm the job.
+
+## 2026-10-14 — Issue #22: Agent hooks, guardrails and permission notes
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. The repository owner's brief arrived as
+  a four-part paragraph with no issue behind it, so the orchestrator created
+  #22 with that text as the raw scope plus a list of repo facts it had
+  checked (where `on-call-responder` lives, what the "issue #12 incident
+  log" is, the secret names in `ci.yml`, which interpreters exist on the
+  development machine), and left all shaping to the PM.
+- **PM input/output:** read the brief against the repo and settled the
+  places where it was underspecified or collided with existing rules. The
+  hook runs through a POSIX `sh` launcher that probes `python3` then
+  `python`, so the Windows Store `python3` stub is skipped; it is
+  stdlib-only and never uses `uv`. No interpreter found is fail-open with
+  a loud stderr warning, with the rationale (fail-closed would block the
+  Bash command needed to repair the hook) to be written down. `custom-agent/`
+  references `on-call-responder` instead of moving it, because Claude Code
+  loads only `.claude/agents/` and the `agents-sync` CI job requires both
+  trees to match. The example run must use the real #12 reopening comment
+  (Render exit 127) and be compared honestly with the later Engineer/QA
+  correction of its root cause. The live check of the hook may only run
+  when local `main` equals `origin/main`, so a hook that failed to fire
+  would make `git push --force origin main` a no-op, and its output goes to
+  a file that is read before anything is pasted. Surfaced rather than
+  silently resolved: the `_local/` block collides with the PM's
+  parking-lot flow (documented as a narrow Edit/Write exception), the
+  PowerShell tool is not covered by a `Bash` matcher (documented as a gap),
+  "close issues" is narrowed to the orchestrator after QA PASS to match
+  `process.md`, and `rm -rf` in `/tmp` is blocked as scoped. Two ideas were
+  parked in the gitignored `_local/make-it-better.md`. The orchestrator
+  reviewed these as in-scope groomings and kept the owner's scope of
+  "Bash commands" rather than widening the matcher.

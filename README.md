@@ -240,6 +240,8 @@ the frontend prototyped in Lovable. Start here:
 - Agent instructions: [`AGENTS.md`](AGENTS.md)
 - Full running log, tools used, what went wrong and was caught:
   [`docs/ai-usage-report.md`](docs/ai-usage-report.md)
+- Security scans, code-review audit, agent-extension risks and the AI tool and
+  data policy: [`security/`](security/)
 
 ## Repository map
 

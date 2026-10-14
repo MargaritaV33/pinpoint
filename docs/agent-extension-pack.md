@@ -195,3 +195,5 @@ There are 1 open fix pin across the two demo rooms.
 The model called `list_rooms` and then `room_summary` for each room, and the
 counts match the seed: Lakeside Villa — Round 2 has 1 open fix pin, Harbour
 Office Atrium has 0.
+
+Security risks of these extensions (injection, MCP credential scope, hook bypass paths): [`security/agent-extension-security.md`](../security/agent-extension-security.md).

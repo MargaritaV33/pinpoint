@@ -933,3 +933,56 @@ standard the project settled on only after being burned once.
   SVG by QA to confirm valid syntax, not just read. No application code
   was touched by either engineer pass. QA verdict: PASS. Orchestrator
   closed issue #14 and pushed `c3fc8cd`, `6f0f3e0` to `main`.
+
+## 2026-10-14 — Issue #15: Reproducibility check
+
+- **Tool:** Claude Code, a single fresh QA agent (no PM, no Engineer, by
+  deliberate request for this issue) plus the orchestrator handling the
+  fixes directly — the first issue in this project run with that
+  shortened lifecycle.
+- **Method:** QA cloned `MargaritaV33/pinpoint` fresh into an isolated
+  temporary folder outside the working repo, with explicit instructions
+  not to read, copy, or reference anything from the existing checkout,
+  any `.env` file, or prior context about the project — only the README
+  and the docs it links, exactly as a first-time peer reviewer would
+  encounter them. It then followed the README top to bottom, in the
+  printed order, recording the exact command and exact output/error for
+  every step rather than summarizing.
+- **What it found.** 18 steps checked individually, 17 passed outright.
+  The one real failure was in the README's own happy path, not an edge
+  case: following the frontend section's `npm install` before the full-
+  stack section's `make up`, on a non-Linux dev machine, leaves
+  `frontend/package-lock.json` rewritten without its Linux-only optional
+  entries — so `make up`'s Docker build fails at `npm ci` with a lockfile-
+  mismatch error. The fix for this exact situation already existed,
+  correctly described, in `docs/testing.md` from issues #9/#10 — but
+  nothing in the README's own text pointed a first-time reader there, so
+  following the README's own instructions in order broke on the README's
+  own prescribed sequence. QA also surfaced 14 separate undocumented
+  assumptions (A1–A14): no `git clone` step at all; `make`, and `uv`'s
+  install mechanism and PATH behavior, named as prerequisites but not
+  actually walked through; a PowerShell `&&`-syntax trap with no warning
+  to use Git Bash instead; required-free ports and network access never
+  stated; several smaller clarifications (`/` being 404-by-design, a
+  harmless first-start reload warning, the Chromium download on `make
+  e2e`'s first run).
+- **Fixes:** all documentation-only, as instructed — no application code
+  was touched, since none of the 18 findings traced to an actual code
+  defect, only to the README's own gaps and ordering. Added the missing
+  clone step, the full prerequisite list, the shell caveat, and — most
+  importantly — the lockfile-restore step at every point in the README
+  where an earlier `npm install` would otherwise silently break a later
+  Docker build.
+- **Verification, not just a rewrite:** rather than trusting that the
+  documented fix command was correct, the orchestrator reproduced the
+  exact failure in the same fresh clone QA had used (ran `npm install`,
+  confirmed the lockfile was dirtied exactly as reported, applied the
+  README's new restore step, then ran `make up` for real) and confirmed
+  it built, came up healthy, and `/health` returned `200` — closing the
+  loop on the one blocking gap with a real re-run, not an inference that
+  the new wording would probably work.
+- **Outcome:** issue #15 closed, the temporary clone deleted, `2522f6a`
+  pushed to `main`. This is the first issue in the project where a single
+  QA pass, run with zero prior context about the repo, served as its own
+  complete verification loop — closer to what an actual outside reviewer
+  will experience than any engineer-authored self-check could be.

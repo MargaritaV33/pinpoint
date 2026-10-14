@@ -1340,3 +1340,49 @@ standard the project settled on only after being burned once.
 - **Verification:** greps, diff stat, 4 config tests. **Not verified:**
   rendered Markdown, whether the Render dashboard still holds a stale
   "Docker Command" value (an owner check), the full suite (docs-only).
+
+## 2026-10-14 — Issue #20: Document GET /health in openapi.yaml
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  subagent per `_docs/process.md`. #20 was filed during #19's grooming with
+  a draft body; the PM groomed it properly in this batch.
+- **PM input/output:** checked the draft against the repo and corrected it.
+  "No code changes needed" was wrong: `backend/tests/test_openapi_contract.py`
+  carves `/health` out with `app_ops.discard(("/health", "get"))`, so
+  documenting it makes `test_app_implements_every_contract_operation` fail
+  until that line is removed (now a criterion; the commit message must name
+  it). That test compares only (path, method) pairs, so the PM added one
+  test, `test_health_contract_matches_the_endpoint`, for operationId,
+  `security: []`, the `Health` tag and the schema (`required` equal to
+  `properties` equal to the keys of the real response), with three named
+  mutations that must each fail once and be reverted. `security: []` is
+  needed because CI's `curl` and the MCP `health()` tool send no token.
+  "Follow the `Error` schema" was dropped (no failure path). The schema
+  follows the repo's nullable convention (`commit`: string, `nullable:
+  true`, like `Room.approvedAt`) with no pattern, since the MCP tests use
+  `abc1234`. The frontend and MCP server need nothing. Recorded that `uv`
+  is not on PATH so QA runs venv equivalents. Parked full-schema contract
+  comparison in `_local/make-it-better.md`.
+- **Engineer input/output:** `openapi.yaml` first (35 added lines: a
+  `Health` tag, `GET /health` / `getHealth` with `security: []` and a 200
+  only, and the `Health` schema), then the test file (the `discard` line
+  removed, the new test added), commits `882725e` and `c93be44`. The second
+  switched the new test to `.get()` after the mutation runs showed a bare
+  `KeyError` hiding which property was wrong. Ran the three mutations plus
+  two variants for real and reverted each. Rejected a frontend
+  `ApiClient.health()` (dead code) and any validator dependency.
+- **QA input/output (PASS):** compared the contract block with
+  `health.py` and real `TestClient` output (`commit` null and set), redid
+  the mutations on the real file with a `git checkout` revert after each,
+  and ran backend (87 passed, baseline 86), the static guest-access test,
+  MCP (51 passed, 6 skipped) and `make frontend-test` (51 passed). The
+  diff touches only `openapi.yaml` and the contract test. `make
+  frontend-test` runs `npm install`, which rewrites
+  `frontend/package-lock.json`; both the Engineer and QA reverted it so it is
+  in no commit. The orchestrator closed the issue.
+- **Review:** the orchestrator accepted the PM's extra test and the
+  `Health` tag name as in scope for a contract issue.
+- **Verification:** commands above. **Not verified:** `make test` and `make
+  mcp-test` as make targets (no `uv`), the rest of `make integration` and
+  `make e2e` (no Compose stack was run), CI until pushed, and the YAML
+  against a real OpenAPI validator (the repo has none).

@@ -615,3 +615,66 @@ verified. Consolidated into a narrative before submission.
   live deployment was attempted or claimed — correctly out of scope for
   this issue. QA verdict: PASS. Orchestrator closed issue #12 and pushed
   `524b2bc` to `main`.
+
+## 2026-10-14 — Issue #12 reopened: Render deploy crashed in production
+
+- **Tool:** Claude Code, orchestrator + Engineer + QA (no PM pass — the
+  repo owner reported the production failure with the root cause and the
+  exact required fix already specified, so the lifecycle ran Engineer →
+  QA directly, per explicit instruction).
+- **What broke:** the real Render deploy crashed on boot —
+  `sh: 1: DATABASE_URL="postgresql://...@dpg-.../pinpoint_xxuj" uv run
+  uvicorn ...: not found`, exit code 127. `render.yaml`'s `dockerCommand`
+  override, verified locally by simulating the command string in
+  isolation (a `subprocess`/`shlex` test), had never actually been run
+  inside the real built image — the one check that would have caught this
+  before it reached production.
+- **The lesson, as the repo owner asked to have it recorded:** issue #12's
+  original QA pass simulated the deploy command correctly in isolation and
+  still missed the real failure, because the bug lived in the gap between
+  "this shell command is syntactically and semantically correct" and
+  "this is actually how the runtime platform invokes it." Executing a
+  command string outside its real execution context — even faithfully,
+  even with real subprocess calls — is not the same as running the real
+  artifact (the built Docker image, with Render's actual invocation
+  mechanism) end to end. The fix for *this* issue was to stop giving
+  Render anything to mis-invoke at all (remove the override, let the
+  Dockerfile's own `CMD` be the only thing that ever starts the
+  container) — but the broader lesson is that a production platform's own
+  invocation semantics are not something a local simulation can stand in
+  for; only actually running the artifact in something resembling the
+  real target does.
+- **Engineer input/output:** implemented the prescribed fix (remove
+  `dockerCommand`; move the `postgres://`/`postgresql://` →
+  `postgresql+psycopg://` normalization into a `Settings` field validator
+  in `backend/app/config.py`, traced through the real call chain to
+  confirm one validator covers every consumer; added a 4-case unit test)
+  — and, while doing so, corrected the originally-stated root cause rather
+  than taking it on faith: `uv` genuinely is present in the runtime image,
+  and the Dockerfile's own `CMD` runs fine unmodified. The actual defect
+  was narrower than first diagnosed (Render's command-override mechanism
+  itself), though the prescribed fix eliminates it regardless of the exact
+  mechanism. Verified this time by actually building and running the real
+  image with a bare `postgresql://` URL against a real Postgres, with no
+  command override — confirmed the container starts clean and a real
+  login succeeds end to end, not simulated.
+- **Review:** QA independently re-derived the same root-cause correction
+  from its own fresh evidence (found `uv` in the image, inspected the
+  Dockerfile's real `Config.Cmd`, ran the unmodified image successfully)
+  rather than repeating the engineer's claim, and re-ran the full real
+  Docker build+run verification itself end to end, going as far as the
+  engineer did (a real login against the seeded account). Surfaced one
+  unrelated but genuinely useful finding along the way: `backend/.python-
+  version` pins 3.11 while the Dockerfile builds on `python:3.12-slim`,
+  so `uv run` resyncs the venv from scratch on every cold start — a real
+  cost on Render's free plan, which spins down and re-starts cold, worth
+  its own follow-up issue.
+- **Verification:** real `docker build` + `docker run` (no mocking, no
+  command simulation) against a real compose Postgres, by both engineer
+  and QA independently — container starts clean, `/health` returns 200,
+  a real demo-account login succeeds through the normalized URL;
+  `backend/tests/test_config.py`'s 4 cases pass; full suite 85/85. QA
+  verdict: PASS. Orchestrator removed a leftover empty test volume QA's
+  sandbox couldn't delete, closed issue #12, and pushed `406a48d`,
+  `5117c40` to `main`. The actual Render redeploy (applying this fix in
+  production) is, as before, the repo owner's own action to take.

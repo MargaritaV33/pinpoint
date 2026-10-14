@@ -250,6 +250,8 @@ the frontend prototyped in Lovable. Start here:
   Compose stack
 - `integration/` — HTTP integration tests against a running Compose stack,
   its own `uv` project
+- `mcp-server/` — read-only MCP server so an AI assistant can query a running
+  Pinpoint; see [`mcp-server/README.md`](mcp-server/README.md)
 - `_docs/` — process, team role definitions, decisions already taken
 - `docs/` — this set of user-facing docs: architecture, testing, deployment,
   release process, AI usage report

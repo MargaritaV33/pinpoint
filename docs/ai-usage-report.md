@@ -986,3 +986,58 @@ standard the project settled on only after being burned once.
   QA pass, run with zero prior context about the repo, served as its own
   complete verification loop — closer to what an actual outside reviewer
   will experience than any engineer-authored self-check could be.
+
+## 2026-10-14 — Issue #18: Agent extension pack: skills and subagents
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`. The first meta-level issue in this
+  project — its subject is the agent-orchestration tooling itself (the
+  four subagent definitions and three skills this exact lifecycle already
+  runs on), not the application.
+- **PM input/output:** researched and grounded every skill's content in
+  real files rather than inventing plausible-sounding process steps —
+  confirmed `release`/`incident-response`'s claimed CI job order and
+  rollback paths against the actual `.github/workflows/ci.yml` and
+  `docs/release-process.md`, and confirmed there's genuinely no Render
+  CLI anywhere in the repo before writing that absence into
+  `on-call-responder`'s body as a stated fact. Made the "propose, never
+  execute" requirement concrete rather than aspirational: a literal
+  forbidden-action list in the subagent's body text, with a frontmatter
+  tool restriction as best-effort reinforcement. Made a clean, reasoned
+  call on where the agents/skills drift-check belongs — a standalone
+  script plus one minimal, deliberately unrelated-to-deploy CI job,
+  rather than forcing it into an existing suite that has nothing to do
+  with a plain file-tree diff.
+- **Engineer input/output:** built all four subagents and three skills,
+  the `.agents/`→`.claude/` sync target and drift-check script, the new
+  CI job, and the documentation index — then hit a real constraint
+  attempting Part 4's proof-of-use: its own harness has a fixed
+  subagent/skill roster snapshotted at session start, so it couldn't
+  directly invoke the project-local `implement-issue` skill or launch
+  `qa-engineer` by name from inside itself. Rather than skip the
+  requirement or fake a result, it disclosed the constraint plainly and
+  worked around it by shelling out to the real, separately-installed
+  `claude` CLI in fresh, zero-context subprocesses — the closest
+  available approximation of "a fresh session actually invoking these by
+  name" — and recorded the verbatim invocations and responses.
+- **Review:** QA treated the engineer's workaround as something to verify
+  rather than take on faith — it reproduced the exact same harness
+  constraint in its own session first (confirming the limitation was
+  real, not a convenient excuse), then independently re-ran both of the
+  engineer's exact invocations from its own fresh subprocesses. One
+  re-run hit the identical, obscure Git-Bash path-rewrite quirk
+  (`/implement-issue` silently rewritten to a filesystem path) that the
+  engineer's transcript had also hit — strong, hard-to-fabricate evidence
+  that the skill genuinely loaded rather than the model improvising a
+  plausible-sounding answer. QA also deliberately introduced a one-byte
+  drift between the `.agents/` and `.claude/` trees to prove
+  `scripts/check-agents-sync.sh` actually catches a regression instead of
+  trivially passing, before reverting it.
+- **Verification:** `make sync-agents` + `scripts/check-agents-sync.sh`
+  clean (exit 0), confirmed to genuinely detect drift when deliberately
+  introduced (exit 1, correct file named) by both passes; every skill's
+  claimed grounding fact-checked against the real files it cites; the
+  new CI job confirmed minimal and correctly excluded from the deploy
+  gate; no symlinks anywhere; only the 20 files the issue's constraints
+  allowed were touched. QA verdict: PASS. Orchestrator closed issue #18
+  and pushed `8d69e70` to `main`.

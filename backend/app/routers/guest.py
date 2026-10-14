@@ -166,4 +166,4 @@ def get_guest_image_file(
             status_code=404,
             detail="No such image, the guest token does not match any room, or the image does not belong to that room.",
         )
-    return image_file_response(image)
+    return image_file_response(image, authenticated=False)

@@ -78,10 +78,19 @@ def build_room_detail(
     )
 
 
-def image_file_response(image: ImageRecord) -> Response:
+def image_file_response(image: ImageRecord, *, authenticated: bool) -> Response:
+    """Image bytes with an ETag. `authenticated` is True for the studio route
+    (bearer token): it is `private`, because a shared cache may only store a
+    response to an Authorization request when it says `public`. The guest
+    route is reached by link alone, so it stays `public`."""
     etag = f'"{image.id}-{int(image.created_at.timestamp())}"'
+    scope = "private" if authenticated else "public"
     return Response(
         content=image.data,
         media_type=image.content_type,
-        headers={"ETag": etag, "Cache-Control": "public, max-age=86400"},
+        headers={
+            "ETag": etag,
+            "Cache-Control": f"{scope}, max-age=86400",
+            "X-Content-Type-Options": "nosniff",
+        },
     )

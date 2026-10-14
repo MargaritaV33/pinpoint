@@ -90,4 +90,4 @@ def get_room_image_file(
     image = store.get_image_in_room(imageId, roomId)
     if image is None:
         raise HTTPException(status_code=404, detail="No such image in this room.")
-    return image_file_response(image)
+    return image_file_response(image, authenticated=True)

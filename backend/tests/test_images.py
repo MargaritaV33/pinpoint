@@ -152,3 +152,31 @@ def test_get_room_image_file_cross_room_is_404(client: TestClient, auth_headers:
     # i_atrium belongs to r_atrium, not r_lakeside.
     response = client.get("/rooms/r_lakeside/images/i_atrium/file", headers=auth_headers)
     assert response.status_code == 404
+
+
+# -- cache scope and sniffing of image bytes (issue #26, security review) -----------
+
+def test_studio_image_file_is_private_not_public(client: TestClient, auth_headers: dict[str, str]) -> None:
+    # The studio route needs a bearer token; a "public" response to an
+    # Authorization request may be stored by a shared cache (RFC 9111).
+    response = client.get("/rooms/r_lakeside/images/i_facade/file", headers=auth_headers)
+
+    assert response.status_code == 200
+    directives = {d.strip() for d in response.headers["cache-control"].split(",")}
+    assert "private" in directives
+    assert "public" not in directives
+
+
+def test_guest_image_file_stays_cacheable(client: TestClient) -> None:
+    response = client.get("/guest/lakeside-demo/images/i_facade/file")
+
+    assert response.status_code == 200
+    assert "public" in response.headers["cache-control"]
+
+
+def test_image_files_are_served_with_nosniff(client: TestClient, auth_headers: dict[str, str]) -> None:
+    studio = client.get("/rooms/r_lakeside/images/i_facade/file", headers=auth_headers)
+    guest = client.get("/guest/lakeside-demo/images/i_facade/file")
+
+    assert studio.headers["x-content-type-options"] == "nosniff"
+    assert guest.headers["x-content-type-options"] == "nosniff"

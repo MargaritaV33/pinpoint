@@ -579,6 +579,44 @@ ENV_NONPRINTING = {
 }  # fmt: skip
 
 
+ENV_BACKUP_SUFFIXES = {"bak", "backup", "orig", "old", "tmp", "save"}
+# Commands whose text operands are words, not files.
+ENV_TEXT_ONLY = {"echo", "printf"}
+GREP_FAMILY = {"grep", "egrep", "fgrep", "zgrep", "rg"}
+# Short options that take an argument. Unknown ones are treated as flags; an
+# unknown option's argument then looks like a pattern or a file, and a word that
+# might be a file is checked as a file (the failure direction is "denied").
+GREP_ARG_SHORT = set("mABCdDf")
+RG_ARG_SHORT = set("mABCdgtTjMfrE")
+GREP_LONG_WITH_ARG = {
+    "--include", "--exclude", "--exclude-dir", "--exclude-from", "--include-from", "--file",
+    "--glob", "--iglob", "--ignore-file", "--pre", "--pre-glob", "--type-add", "--type",
+    "--type-not", "--max-count", "--after-context", "--before-context", "--context",
+    "--binary-files", "--directories", "--devices", "--label", "--max-depth", "--max-filesize",
+    "--threads", "--replace", "--encoding", "--sort", "--sortr", "--colors", "--engine",
+    "--max-columns", "--path-separator",
+}  # fmt: skip
+FIND_NAME_TESTS = {
+    "-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex",
+    "-lname", "-ilname",
+}  # fmt: skip
+FIND_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls", "-delete"}
+
+
+def is_env_template(base):
+    """`.env` + dot-segments whose last non-backup segment is example/sample/...
+
+    One optional backup suffix may follow: `.env.example`, `.env.example.bak`.
+    `.env.bak`, `.env.local.bak` and `.env.example.local` are real files.
+    """
+    if not ENV_BASE_RE.match(base):
+        return False
+    segs = base.lower().split(".")[2:]
+    if segs and segs[-1] in ENV_BACKUP_SUFFIXES:
+        segs = segs[:-1]
+    return bool(segs) and segs[-1] in ENV_TEMPLATE_SUFFIXES
+
+
 def real_env_name(word):
     """Return the file name if `word` points at a real env file, else None."""
     p = to_slashes(word).replace(SUB, "")
@@ -590,23 +628,167 @@ def real_env_name(word):
             if base.startswith(".") and any(fnmatch.fnmatchcase(c, base.lower()) for c in ENV_GLOB_CANDIDATES):
                 return base
             continue
-        if ENV_BASE_RE.match(base) and base.rsplit(".", 1)[-1].lower() not in ENV_TEMPLATE_SUFFIXES:
+        if ENV_BASE_RE.match(base) and not is_env_template(base):
             return base
     return None
+
+
+def grep_file_operands(name, args):
+    """The words of a grep-family command that are files (or might be).
+
+    The pattern (the first positional, or the value of -e / --regexp) is a
+    mention, not a file. `-f FILE` reads patterns from the file, so FILE is a
+    file operand and every positional is a file too.
+    """
+    short_with_arg = RG_ARG_SHORT if name == "rg" else GREP_ARG_SHORT
+    files, positionals = [], []
+    have_pattern = after_dd = False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if after_dd or not a.startswith("-") or a == "-":
+            positionals.append(a)
+        elif a == "--":
+            after_dd = True
+        elif a.startswith("--"):
+            opt, eq, val = a.partition("=")
+            if opt == "--regexp":
+                have_pattern = True
+                if not eq and i < len(args):
+                    i += 1
+            elif eq:
+                files.append(val)
+                have_pattern = have_pattern or opt == "--file"
+            elif opt in GREP_LONG_WITH_ARG and i < len(args):
+                files.append(args[i])
+                have_pattern = have_pattern or opt == "--file"
+                i += 1
+        else:
+            letters = a[1:]
+            for j, ch in enumerate(letters):
+                rest = letters[j + 1 :]
+                if ch == "e":
+                    have_pattern = True
+                    if not rest and i < len(args):
+                        i += 1
+                    break
+                if ch in short_with_arg:
+                    have_pattern = have_pattern or ch == "f"
+                    if rest:
+                        files.append(rest)
+                    elif i < len(args):
+                        files.append(args[i])
+                        i += 1
+                    break
+    return files + (positionals if have_pattern else positionals[1:])
+
+
+def find_operands(args):
+    """Return (file words, name patterns, has_action) for a find command."""
+    words, patterns, has_action = [], [], False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in FIND_NAME_TESTS and i + 1 < len(args):
+            patterns.append(args[i + 1])
+            i += 2
+            continue
+        has_action = has_action or a in FIND_ACTIONS
+        words.append(a)
+        i += 1
+    return words, patterns, has_action
+
+
+def cp_operands(args):
+    """Return (positionals, option values that are paths, has -t / --target-directory)."""
+    pos, values = [], []
+    has_target = after_dd = False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if after_dd or not a.startswith("-") or a == "-":
+            pos.append(a)
+        elif a == "--":
+            after_dd = True
+        elif a.startswith("--"):
+            opt, eq, val = a.partition("=")
+            if opt == "--target-directory":
+                has_target = True
+                if eq:
+                    values.append(val)
+                elif i < len(args):
+                    values.append(args[i])
+                    i += 1
+        else:
+            letters = a[1:]
+            if "t" in letters:
+                has_target = True
+                rest = letters.split("t", 1)[1]
+                if rest:
+                    values.append(rest)
+                elif i < len(args):
+                    values.append(args[i])
+                    i += 1
+    return pos, values, has_target
+
+
+def is_plain_env_destination(word):
+    """True only for a path whose last component is exactly `.env`."""
+    p = to_slashes(word)
+    if SUB in p or p.endswith("/"):
+        return False
+    return p.rsplit("/", 1)[-1].lower() == ".env"
+
+
+def env_file_operands(name, args):
+    """Split a command's words into (words checked as files, extra denial or None).
+
+    Mentions that cannot print or change file contents are left out: grep-family
+    patterns, `find -name` patterns, a `for` word list, the text of echo/printf.
+    Everything else is a file operand and is checked exactly as before.
+    """
+    if name in ENV_TEXT_ONLY or name == "for":
+        return [], None
+    if name in GREP_FAMILY:
+        return grep_file_operands(name, args), None
+    if name == "find":
+        words, patterns, has_action = find_operands(args)
+        if has_action:
+            for p in patterns:
+                hit = real_env_name(p)
+                if hit:
+                    return words, f"find ... {hit} with an exec/print/delete action"
+        return words, None
+    if name == "cp":
+        pos, values, has_target = cp_operands(args)
+        if len(pos) == 2 and not has_target:
+            src, dst = pos
+            if is_env_template(to_slashes(src).rsplit("/", 1)[-1]) and SUB not in src and is_plain_env_destination(dst):
+                # The one allowed way to create .env: copy it from a template.
+                return pos[:1] + values, None
+        return pos + values, None
+    return args, None
 
 
 def rule3_env(name, args, cmd):
     instead = (
         "Real env files hold secrets and are the owner's. Read .env.example for the "
-        "variable names, or ask the repo owner. Do not print values."
+        "variable names, or ask the repo owner. Do not print values. "
+        "(Creating .env is allowed only as: cp .env.example .env)"
     )
     out = []
     if name and name not in ENV_NONPRINTING:
-        for a in args:
-            hit = real_env_name(a)
-            if hit:
-                out.append(Violation(3, f'{name} {hit}  (only the file name is quoted)', instead))
-                break
+        operands, extra = env_file_operands(name, args)
+        if extra:
+            out.append(Violation(3, f"{name} {extra}  (only the file name is quoted)", instead))
+        else:
+            for a in operands:
+                hit = real_env_name(a)
+                if hit:
+                    out.append(Violation(3, f'{name} {hit}  (only the file name is quoted)', instead))
+                    break
     for kind, targets in (("write to", cmd.outs), ("read from", cmd.ins)):
         for t in targets:
             hit = real_env_name(t)

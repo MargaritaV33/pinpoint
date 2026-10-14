@@ -181,7 +181,6 @@ class Rule3EnvFiles(GuardTestCase):
             "echo SECRET=1 >> .env",
             "echo SECRET=1 >> backend/.env",
             "printf x | tee .env",
-            "cp .env.example .env",
             "mv foo .env",
             "cat < .env",
             "cat .e*",
@@ -208,6 +207,144 @@ class Rule3EnvFiles(GuardTestCase):
         ]:
             with self.subTest(command=command):
                 self.assertAllowed(command)
+
+    # Issue #23: the owner's decision is that an agent may create .env from a
+    # template with cp, and nothing else may write it.
+
+    def test_allowed_cp_from_a_template_to_dot_env(self):
+        for command in [
+            "cp .env.example .env",  # the README's first setup step
+            "cp ./.env.example ./.env",
+            "cp .env.example backend/.env",
+            "cp -n .env.example .env",
+            'cp .env.example ".env"',
+        ]:
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_allowed_template_copies_and_readers(self):
+        for command in [
+            "cp .env.example .env.example.bak",
+            "cp .env.example.bak .env.example",
+            "cp .env.local.example .env.example",
+            "cat .env.example",
+            "cat .env.example.bak",
+            "head .env.example",
+            "grep -n JWT .env.example",
+            "grep -n JWT .env.example.bak",
+            "cat .env.local.example",
+        ]:
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_allowed_grep_family_pattern_mentions(self):
+        for command in [
+            'grep -rn ".env" docs',
+            'grep -rn "\\.env" docs',
+            "grep -rn .env docs",
+            "ls -a | grep -E '^\\.env'",
+            "grep -e .env docs",
+            "grep --regexp=.env docs",
+            'rg ".env" docs',
+            "egrep '^\\.env' README.md",
+            "grep -n .env .env.example",
+        ]:
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_allowed_find_name_patterns(self):
+        for command in [
+            'find . -name ".env*"',
+            'find . -iname ".env.*"',
+            "find . -name .env -type f",
+            'find . -path "*/.env*"',
+        ]:
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_allowed_loop_word_lists_and_echo_text(self):
+        for command in [
+            'for f in ".env" ".env.local"; do echo "$f"; done',
+            'for f in .env .env.example; do test -f "$f" && echo yes; done',
+            "echo .env",
+            'echo "see .env"',
+            "printf '%s\\n' .env",
+        ]:
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_denied_cp_and_mv_with_real_env_files(self):
+        for command in [
+            "cp .env .env.bak",
+            "cp .env /tmp/x",
+            "cp backend/.env x",
+            "cp .env.local x",
+            "cp foo .env",
+            "cp /tmp/x .env",
+            "cp .env.example .env.local",
+            "cp .env.example .env.production",
+            "cp .env.example .env.bak",
+            "cp .env.example foo .env",  # not exactly one template source
+            "cp -t . .env",
+            "cp -r . .env",
+            "mv .env.example .env",
+            "mv .env .env.bak",
+        ]:
+            with self.subTest(command=command):
+                self.assertDenied(command, 3)
+
+    def test_denied_other_ways_to_write_dot_env(self):
+        for command in [
+            "cat .env.example > .env",
+            "cp .env.example .env && cat .env",
+            "sed -i 's/a/b/' .env",
+            "sed -i s/a/b/ .env.local",
+            "tee .env.production",
+            "echo .env > .env",
+            "printf x >> .env.local",
+        ]:
+            with self.subTest(command=command):
+                self.assertDenied(command, 3)
+
+    def test_denied_non_template_look_alikes(self):
+        for command in ["cat .env.bak", "cat .env.example.local", "cp .env.bak x"]:
+            with self.subTest(command=command):
+                self.assertDenied(command, 3)
+
+    def test_denied_grep_family_with_a_real_file_operand(self):
+        for command in [
+            "grep -e JWT .env",
+            "grep -f .env foo",  # -f reads the patterns from the file
+            "grep -rn JWT docs .env",
+            "rg -n JWT .env",
+            'grep -r JWT --include=".env*" .',
+            'grep -r --include ".env*" JWT .',
+            'rg --hidden -g ".env*" JWT',
+        ]:
+            with self.subTest(command=command):
+                self.assertDenied(command, 3)
+
+    def test_denied_find_that_can_print_contents(self):
+        for command in [
+            'find . -name ".env*" -exec cat {} +',
+            "find . -name .env -execdir cat {} \\;",
+            'find . -name ".env*" -fprint out.txt',
+        ]:
+            with self.subTest(command=command):
+                self.assertDenied(command, 3)
+
+    def test_denied_loop_that_touches_the_file_for_real(self):
+        self.assertDenied("for f in .env; do cat .env; done", 3)
+
+    def test_denied_by_default_for_other_commands(self):
+        for command in ["source .env", "base64 .env", "cut -d= -f1 .env", "sort .env"]:
+            with self.subTest(command=command):
+                self.assertDenied(command, 3)
+
+    def test_denial_still_points_at_the_template(self):
+        err = self.assertDenied("cat .env", 3)
+        self.assertIn(".env.example", err)
+        self.assertIn("ask the repo owner", err)
 
     def test_message_quotes_only_the_file_name(self):
         err = self.assertDenied("echo SECRET_VALUE_12345 >> .env", 3)

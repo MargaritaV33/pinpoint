@@ -1,4 +1,4 @@
-.PHONY: sync run test frontend-test up down integration e2e
+.PHONY: sync run test frontend-test up down integration e2e sync-agents
 
 sync:
 	cd backend && uv sync
@@ -31,3 +31,14 @@ integration:
 # docs/testing.md for the full detection/teardown contract.
 e2e:
 	cd e2e && npm install && node scripts/run.mjs
+
+# Copies the canonical agent/skill definitions under .agents/ into the
+# real (non-symlinked) working copy under .claude/ that Claude Code
+# actually loads, removing anything on the .claude/ side that no longer
+# exists on the .agents/ side. See agent-capabilities/README.md and
+# scripts/check-agents-sync.sh.
+sync-agents:
+	rm -rf .claude/agents .claude/skills
+	mkdir -p .claude/agents .claude/skills
+	cp -r .agents/agents/. .claude/agents/
+	cp -r .agents/skills/. .claude/skills/

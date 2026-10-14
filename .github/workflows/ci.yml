@@ -108,6 +108,14 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  agents-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check .agents/ and .claude/ are in sync
+        run: bash scripts/check-agents-sync.sh
+
   deploy:
     needs: [stack]
     runs-on: ubuntu-latest

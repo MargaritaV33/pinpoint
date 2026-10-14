@@ -876,3 +876,60 @@ standard the project settled on only after being burned once.
   86/86, local `make test` 86/86. QA verdict: PASS. Orchestrator removed
   a leftover verification image, closed issue #17, and pushed `ec6f564`
   to `main`.
+
+## 2026-10-14 — Issue #14: Documentation pass
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer (two passes, one
+  blocked on a QA FAIL) + QA (two passes), each a fresh session per
+  `_docs/process.md`. The issue this entry describes is itself the
+  documentation this entry lives in — `docs/ai-usage-report.md`'s own
+  `## Summary` section and this `## Appendix` heading were both added as
+  part of this issue.
+- **PM input/output:** grounded every diagram, table, and claim in real,
+  current files rather than the task brief's own assertions — read
+  `backend/app/store/sqlalchemy/models.py` directly for the data model
+  (5 real tables, not invented fields), `openapi.yaml` for the auth-flow
+  wording, and every env/Compose/Render config file for the environment
+  matrix. Caught that the README's existing "Status: specification and
+  backlog" line was stale and made removing it an explicit criterion.
+  Made the "verify every command" requirement literal and enumerated (9
+  named commands with required exit codes/output) rather than a vague
+  "check the README looks right."
+- **Engineer input/output:** rewrote all four docs and ran the full
+  enumerated verification list for real — including a complete
+  `make up`/`make integration`/`make down`/`make e2e` cycle — rather than
+  writing plausible-sounding prose. No real application bug surfaced
+  during verification, so none was fabricated to report.
+- **Review (QA pass 1): FAIL.** QA re-ran every one of the 9 commands
+  independently rather than trusting the engineer's recorded output, and
+  additionally cross-checked the new `ai-usage-report.md` Summary's three
+  named historical bug examples against the real closed-issue threads
+  (`gh issue view 12/7/5 --comments`) instead of trusting the summary's
+  own retelling — catching a real factual error: the summary claimed a
+  CORS block caused the frontend to "silently" fall back to the mock,
+  which is backwards (a CORS block fails loudly; the actual silent-mock
+  bug and the CORS/port bug were two separate, sequential findings within
+  issue #5, not one causal chain).
+- **Engineer (follow-up):** rewrote the one bullet to describe the two
+  real, sequential bugs accurately, re-checking the new text
+  sentence-by-sentence against issue #5's actual thread before
+  committing, and touched nothing else.
+- **Review (QA pass 2): PASS.** Independently re-read issue #5's full
+  thread itself (not just comparing the engineer's before/after text) to
+  confirm the correction's every claim — fix order, the "mock already
+  out of the picture" detail, the exact `400 Disallowed CORS origin`
+  text, the `strictPort: true` fix — matches the real history, and
+  confirmed via `git diff` that the fix commit touched only that one
+  bullet, so the first pass's full 9-command verification still stood
+  without needing to be rerun.
+- **Verification:** all 9 enumerated README commands run and confirmed
+  independently by both engineer and QA (`make sync`; `make run` + health
+  check; frontend-against-real-backend login with demo credentials;
+  `make test` 86 passed; `make frontend-test` 51 passed, with the known
+  lockfile-reversion risk caught and restored by both passes; a full
+  `make up`/`make down` cycle; `make up` + `make integration` 15 passed +
+  `make down`; `make e2e` 2 passed, stack lifecycle symmetry preserved).
+  The architecture doc's two Mermaid diagrams were actually rendered to
+  SVG by QA to confirm valid syntax, not just read. No application code
+  was touched by either engineer pass. QA verdict: PASS. Orchestrator
+  closed issue #14 and pushed `c3fc8cd`, `6f0f3e0` to `main`.

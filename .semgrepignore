@@ -1,0 +1,6 @@
+# Semgrep falls back to built-in default ignore patterns (which skip every
+# tests/ directory) when a repository has no .semgrepignore. This file exists
+# so that tests, e2e and integration code are scanned too, and lists only
+# binary files that no text rule can match. Reasons: security/semgrep-report.md.
+*.jpg
+*.ico

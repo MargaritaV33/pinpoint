@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
+import jwt
 from fastapi.testclient import TestClient
+
+from app.config import settings
 
 
 # -- signup -------------------------------------------------------------------
@@ -69,6 +74,23 @@ def test_logout_invalidates_the_token(client: TestClient, auth_headers: dict[str
 
     follow_up = client.get("/auth/me", headers=auth_headers)
     assert follow_up.status_code == 401
+
+
+def test_validly_signed_token_without_a_session_row_is_rejected(client: TestClient) -> None:
+    # A JWT signed with the server's own secret for a real user id, but never
+    # issued by /auth/login or /auth/signup, so it has no row in `sessions`.
+    # This is what keeps a leaked or public JWT secret from being enough to
+    # impersonate a user (issue #26 audit, see security/pr-audit.md).
+    now = datetime.now(timezone.utc)
+    forged = jwt.encode(
+        {"sub": "u_demo", "iat": now, "exp": now + timedelta(minutes=30)},
+        settings.jwt_secret,
+        algorithm="HS256",
+    )
+
+    response = client.get("/auth/me", headers={"Authorization": f"Bearer {forged}"})
+
+    assert response.status_code == 401
 
 
 def test_logout_without_token_is_401(client: TestClient) -> None:

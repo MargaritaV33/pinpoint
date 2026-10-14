@@ -678,3 +678,50 @@ verified. Consolidated into a narrative before submission.
   sandbox couldn't delete, closed issue #12, and pushed `406a48d`,
   `5117c40` to `main`. The actual Render redeploy (applying this fix in
   production) is, as before, the repo owner's own action to take.
+
+## 2026-10-14 — Issue #13: Continuous deployment
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`. Same hard verification boundary as
+  issue #12 — no agent has Render dashboard access or the real
+  `RENDER_DEPLOY_HOOK_URL`/`PUBLIC_URL` secrets, so this issue's own "done"
+  deliberately excludes a real triggered deploy.
+- **PM input/output:** before writing a single criterion, researched
+  whether Render needed a Docker build-arg to expose the deployed git SHA
+  — and found it already injects `RENDER_GIT_COMMIT` automatically at both
+  build and runtime, with zero Blueprint config. This single finding
+  eliminated an entire planned Dockerfile change the original task brief
+  assumed was necessary. Also caught that the brief's proposed
+  `autoDeploy: true|false` key is deprecated in favor of
+  `autoDeployTrigger`, and confirmed Render's undocumented-to-the-brief
+  default (`commit`) means this issue's `off` value is a real behavior
+  change, not a restatement of an existing no-op. Set the smoke-test poll
+  budget at 10 minutes rather than the brief's example 2 minutes, with the
+  reasoning spelled out in the issue so a future pass doesn't silently
+  shorten it back into flakiness.
+- **Engineer input/output:** implemented the health-check change, the
+  `deploy` job, the `render.yaml` key, and the release-process doc
+  exactly to spec. Found and fixed one test that the `/health` shape
+  change genuinely broke (`test_frontend_fallback.py`), outside the
+  issue's named file list but a direct, necessary consequence of the
+  change rather than scope creep. Verified the shell poll loop's logic by
+  extracting it into a standalone harness with a mocked `curl`/`jq` rather
+  than only reading it, covering the success, timeout, and
+  stale-commit-never-matches cases.
+- **Review:** QA re-ran the engineer's loop-harness approach independently
+  and extended it with three failure modes the engineer hadn't tried (a
+  non-JSON response body, a `curl` connection failure, an HTTP 500) to
+  confirm the guards degrade gracefully rather than crashing or falsely
+  succeeding. On the one open technical question flagged by the engineer
+  — whether `autoDeployTrigger: off` is misinterpreted as a YAML boolean
+  — QA didn't just reason about it, it fetched Render's own published
+  Blueprint JSON schema and confirmed `autoDeployTrigger` is a strict
+  string enum in Render's own validation, not a boolean, settling the
+  question with external evidence rather than inference.
+- **Verification:** `make test` → 86 passed (both passes, independently);
+  both `ci.yml` and `render.yaml` confirmed to diff only the intended new
+  lines; the deploy job's loop logic verified correct under 4+ scenarios
+  by two independent harnesses. No real deploy was attempted or claimed —
+  correctly out of scope pending the repo owner's secret/variable setup.
+  QA verdict: PASS. Orchestrator closed issue #13 and pushed `9914f3f`,
+  `d8e5494`, `328d819` to `main`.

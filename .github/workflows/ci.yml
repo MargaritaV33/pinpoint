@@ -174,6 +174,66 @@ jobs:
           test "$code" -eq 2 || { echo "expected exit 2 for the force push, got $code"; exit 1; }
           echo "$allow" | sh agent-hooks/run.sh pretool_bash_guard.py
 
+  security:
+    # Semgrep static scan of the tracked files (issue #26; method, triage and
+    # limits: security/semgrep-report.md). Same image tag, --config list and
+    # --exclude list as "How to reproduce" there; keep the two in step.
+    #
+    # Two steps. The first writes semgrep.json with every severity and never
+    # fails on findings (a failure to load the rulesets, exit code 2, still
+    # turns the job red). The file is written outside the checkout so the gate
+    # step does not scan the report. The second is the gate: it fails the build on any
+    # ERROR finding. WARNING and INFO findings are reported only.
+    #
+    # What counts as a new finding: there is no baseline file and no
+    # --baseline-commit. A finding fails the gate unless it is fixed or
+    # suppressed on its own line with `# nosemgrep: <rule-id>` (`//` in
+    # TypeScript), the reason in a normal comment on the line above.
+    # One exception, tracked in #30: --exclude-rule below switches off the
+    # Dockerfile "no USER" rule, because the Dockerfile may not be edited by
+    # issue #26 (neither fix nor inline suppression). Remove it when #30 lands.
+    #
+    # Limitation: the registry rulesets (p/python, p/typescript, p/secrets,
+    # p/owasp-top-ten) are fetched when the job runs and are not pinned by the
+    # image tag, so a rule update can turn a green tree red without any change
+    # to the code. That is why this job is deliberately not in `deploy.needs`
+    # (kept at [stack]), like `mcp` and `hooks`: a red `security` shows on the
+    # commit but cannot block a release. Gating the deploy on it is the
+    # owner's decision (docs/permissions.md, "Making a new CI job gate
+    # `deploy`"), tracked in #27.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep:1.180.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep report (all severities)
+        run: >-
+          semgrep scan --metrics=off --disable-version-check
+          --config p/python --config p/typescript --config p/secrets --config p/owasp-top-ten
+          --exclude .env --exclude .env.local --exclude '.env.*.local' --exclude _local
+          --exclude node_modules --exclude .venv --exclude dist --exclude .output --exclude '*.db'
+          --json --output "$RUNNER_TEMP/semgrep.json" .
+
+      - name: Upload semgrep.json
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: ${{ runner.temp }}/semgrep.json
+          if-no-files-found: ignore
+
+      - name: Semgrep gate (ERROR findings fail the build)
+        run: >-
+          semgrep scan --metrics=off --disable-version-check
+          --config p/python --config p/typescript --config p/secrets --config p/owasp-top-ten
+          --exclude .env --exclude .env.local --exclude '.env.*.local' --exclude _local
+          --exclude node_modules --exclude .venv --exclude dist --exclude .output --exclude '*.db'
+          --severity ERROR --error
+          --exclude-rule dockerfile.security.missing-user.missing-user .
+
   deploy:
     needs: [stack]
     runs-on: ubuntu-latest

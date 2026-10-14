@@ -423,7 +423,14 @@ paths:
               schema:
                 type: string
             Cache-Control:
-              description: "e.g. `public, max-age=86400`."
+              description: >
+                `private, max-age=86400`. `private` because this route needs
+                a bearer token, so a shared cache (proxy, CDN) must not store
+                the response.
+              schema:
+                type: string
+            X-Content-Type-Options:
+              description: Always `nosniff`.
               schema:
                 type: string
           content:
@@ -476,6 +483,10 @@ paths:
                 type: string
             Cache-Control:
               description: "e.g. `public, max-age=86400`."
+              schema:
+                type: string
+            X-Content-Type-Options:
+              description: Always `nosniff`.
               schema:
                 type: string
           content:

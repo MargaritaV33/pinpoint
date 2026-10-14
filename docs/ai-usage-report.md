@@ -725,3 +725,47 @@ verified. Consolidated into a narrative before submission.
   correctly out of scope pending the repo owner's secret/variable setup.
   QA verdict: PASS. Orchestrator closed issue #13 and pushed `9914f3f`,
   `d8e5494`, `328d819` to `main`.
+
+## 2026-10-14 — Issue #17: Align Python version between .python-version and the Dockerfile
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`. Follow-up from a side finding QA
+  surfaced during issue #12's incident fix (venv resync cost on every
+  cold start), filed and run as its own issue.
+- **PM input/output:** traced the actual resync mechanism through the
+  real Dockerfile line numbers rather than repeating the task brief's
+  assertion — and in doing so corrected a real error in the brief itself:
+  the baked venv lives at `/app/backend/.venv` (because `uv sync` runs
+  with `cd backend` while `WORKDIR` is `/app`), not `/app/.venv` as
+  assumed. Also reasoned explicitly about which of the two prescribed
+  changes was load-bearing: the `CMD` change alone eliminates the
+  cold-start cost (bypassing `uv run` entirely means there's no
+  sync-check to trigger regardless of version alignment), while the
+  version bump is separately worth doing because the same image's
+  legitimate `uv run pytest` path (`backend-test`) would otherwise still
+  pay the same resync cost. Checked CI's own Python setup and confirmed
+  it was already consistent (3.12) and never part of the problem, closing
+  off a scope question before it could become unnecessary work.
+- **Engineer input/output:** a precise two-line fix across two files.
+  Caught and fixed its own near-miss before it mattered: a first commit
+  draft accidentally included a GitHub auto-close keyword ("Closes #17"),
+  which would have closed the issue out from under QA on push to `main` —
+  noticed and amended before any push happened. Verified with real,
+  unsimulated Docker runs: confirmed the baked interpreter now matches,
+  confirmed zero uv-sync output in a running container's logs (the one
+  check that actually proves the fix), and incidentally discovered a
+  stale local image tag masking the fix on first attempt — caught it via
+  the unexpected 3.11 download in the logs, force-rebuilt, and got the
+  real signal.
+- **Review:** QA independently reran every verification step from a
+  clean/no-cache state rather than trusting the engineer's run (including
+  its own forced rebuild of the `backend-test` service, the same stale-
+  cache trap the engineer had just hit), confirmed the commit message
+  carried no auto-close keyword, and swept the full container log output
+  itself for sync-related lines rather than trusting a summary.
+- **Verification:** real `docker build`/`docker run` (no mocking) by both
+  passes — interpreter version confirmed `3.12.x`, zero uv-sync output at
+  container start, Compose and the `backend-test` profile both green at
+  86/86, local `make test` 86/86. QA verdict: PASS. Orchestrator removed
+  a leftover verification image, closed issue #17, and pushed `ec6f564`
+  to `main`.

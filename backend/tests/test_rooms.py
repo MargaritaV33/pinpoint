@@ -37,6 +37,26 @@ def test_create_room_happy_path(client: TestClient, auth_headers: dict[str, str]
     assert body["guestToken"]
 
 
+def test_create_room_guest_token_has_at_least_128_bits(client: TestClient, auth_headers: dict[str, str]) -> None:
+    # The guest token is the only credential on a share link, so it must not be
+    # guessable. `new_id` keeps 12 hex chars (48 bits); the token needs 128.
+    tokens = set()
+    for _ in range(3):
+        response = client.post("/rooms", json={"title": "Token", "clientName": "A. Client"}, headers=auth_headers)
+        tokens.add(response.json()["guestToken"])
+
+    assert len(tokens) == 3
+    for token in tokens:
+        assert token.startswith("g_")
+        # token_urlsafe(16) is 22 base64url characters = 128 bits.
+        assert len(token.removeprefix("g_")) >= 22
+
+    # A new token resolves its room as a guest, and the seeded demo token still does.
+    new_token = next(iter(tokens))
+    assert client.get(f"/guest/{new_token}").status_code == 200
+    assert client.get("/guest/lakeside-demo").status_code == 200
+
+
 def test_create_room_blank_title_is_400(client: TestClient, auth_headers: dict[str, str]) -> None:
     response = client.post("/rooms", json={"title": "  ", "clientName": "A. Client"}, headers=auth_headers)
     assert response.status_code == 400

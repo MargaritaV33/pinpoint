@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.auth import get_current_user
 from app.export import format_open_pins_export
-from app.ids import new_id
+from app.ids import new_guest_token, new_id
 from app.models.schemas import CreateRoomInput, Room, RoomDetail, RoomSummary, StudioUser
 from app.serializers import build_room_detail, room_summary_to_schema, room_to_schema
 from app.store import Store, get_store
@@ -54,7 +54,7 @@ def create_room(
         client_name=client_name,
         created_at=datetime.now(timezone.utc),
         status="open",
-        guest_token=new_id("g"),
+        guest_token=new_guest_token(),
         approved_at=None,
         approved_by=None,
     )

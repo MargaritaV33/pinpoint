@@ -1167,3 +1167,60 @@ standard the project settled on only after being burned once.
   is outside the issue's file list. It did not present the example run as
   an independent diagnosis: the agent read `render.yaml` and this report,
   which already held the corrected cause, and said so.
+- **QA input/output (first pass: FAIL):** a fresh QA session checked
+  criteria A to G against the committed files and by running them. It piped
+  about 300 PreToolUse payloads into the launcher (every listed deny and
+  allow spelling, extra bypass spellings, unterminated quotes, heredocs and
+  commit messages that mention a blocked pattern, malformed input, ordinary
+  git, make, docker, pytest and gh commands), checked the PostToolUse
+  reminder on `backend/`, `frontend\` and absolute Windows paths, compared
+  the live-evidence block messages with the guard's real output, and
+  scanned every changed file for values from the real local env file
+  without printing any. It posted `## QA: FAIL` on criterion G only: a
+  stray blank line in `docs/agent-extension-pack.md` ended the Markdown
+  table, so the hook, permissions and custom-agent rows rendered as plain
+  pipe text. No test covers that file, so only a look at the rendered
+  structure could catch it. QA also recorded non-failing friction: the
+  env-file rule is deny-by-default and blocks some harmless commands that
+  only name the file as a search pattern (`grep -rn ".env" docs`,
+  `find -name ".env*"`), and `docs/deployment.md` lines 26 and 43 are stale.
+- **Engineer fix pass:** a fresh Engineer got QA's comment as its only
+  input and deleted that single blank line (commit `31047a5`, one deletion
+  in one file), checked every line of the table starts with `|`, and
+  reran `make hooks-test` and the sync check. The non-failing observations
+  were deliberately left alone.
+- **QA input/output (second pass: PASS):** another fresh QA session
+  re-checked G on the file (rows contiguous, all six criterion-12 items
+  point at existing paths), reran `make hooks-test` (52 tests, OK),
+  `check-agents-sync.sh` (exit 0) and the `ci.yml` parse (`hooks` in
+  neither `stack.needs` nor `deploy.needs`), spot-probed the guard with 65
+  payloads that all matched, and confirmed the diff against `0a382f7`
+  touches only the 15 whitelisted files with no trailers on any commit. It
+  posted `## QA: PASS`. The orchestrator then closed the issue.
+- **Review:** the orchestrator accepted the PM's defaults rather than
+  widening scope: the hook matcher stays `Bash` as the owner wrote
+  (the PowerShell tool is a documented gap), "close issues" follows
+  `process.md` (orchestrator after QA PASS), and the `_local/` block has a
+  narrow documented exception for the PM's parking-lot file. It changed one
+  thing the PM had put in the Engineer's hands: the live force-push check
+  runs in a throwaway clone, because a committed hook means local `main`
+  can no longer equal `origin/main`, and a hook that failed to fire there
+  could neither touch GitHub nor leak a real secret.
+- **Verification:** `make hooks-test` passes (52 tests, Windows, Git Bash,
+  Python 3.14, no `uv`) in both QA passes and in the Engineer's runs. A
+  fresh headless Claude Code session in the throwaway clone had
+  `git push --force origin main` and `cat .env` blocked by the guard's own
+  rule messages (hook exit 2) while the control `cat .env.example` ran; the
+  evidence is in the issue thread. The PostToolUse reminder reached the
+  agent after a `Write` under `backend/`. The launcher printed its
+  "guardrails are NOT active" warning and exited 1 with no Python on
+  `PATH`. A real `on-call-responder` run on the verbatim #12 reopening
+  comment made 12 tool calls, all Read, Glob and Grep. **Not verified:**
+  the `hooks` CI job on GitHub (checked after the push, see below), Linux
+  and Python 3.8 to 3.13 locally, other assistants' hook formats (marked
+  "not verified" in `agent-hooks/README.md`), and the backend, frontend,
+  MCP, integration and e2e suites, which were not run because nothing under
+  `backend/`, `frontend/` or `mcp-server/` changed and `uv` is not on this
+  machine's PATH. **Follow-ups:** `docs/deployment.md` lines 26 and 43
+  still describe the removed `dockerCommand`; the env-file rule's false
+  positives may need loosening if they get in the way.

@@ -566,3 +566,52 @@ verified. Consolidated into a narrative before submission.
   closed issue #11 — both commits (`d93f8cd`, `4c94587`) were already on
   `origin/main` from the engineer's required mid-work pushes, so nothing
   further needed pushing.
+
+## 2026-10-14 — Issue #12: Deployment to Render
+
+- **Tool:** Claude Code, orchestrator + PM + Engineer + QA, each a fresh
+  session per `_docs/process.md`. First issue in this project with a hard
+  boundary built into its own definition of done: no agent has Render
+  dashboard access, so the deliverable stops at a committed, locally-
+  verified Blueprint + docs, with the actual "Apply" click explicitly
+  handed off as a numbered list for the repo owner.
+- **PM input/output:** found a real, would-be-silent production bug before
+  any code was written — Render's `fromDatabase` connection string is a
+  bare `postgresql://` URL, but this backend only has `psycopg[binary]`
+  installed, not `psycopg2`, which is SQLAlchemy's default driver for that
+  bare scheme. Without a fix, the app would have deployed successfully and
+  then crashed on boot with `ModuleNotFoundError`. Designed the fix
+  entirely inside `render.yaml`'s `dockerCommand` (a `sed` rewrite to
+  `postgresql+psycopg://`) rather than touching `backend/`, since this
+  issue's own constraints rule out application-code changes. Also went
+  var-by-var through `backend/app/config.py`'s settings to decide which
+  needed an explicit `render.yaml` entry versus which could rely on their
+  existing defaults, rather than copying every `.env.example` var
+  reflexively.
+- **Engineer input/output:** built `render.yaml` and `docs/deployment.md`
+  exactly to spec, then — correctly recognizing the task's own boundary —
+  did not attempt to open a dashboard or claim a deployment happened.
+  Instead ran every check that *was* locally possible: parsed the YAML,
+  executed the dialect-rewrite `sed` command standalone against both URL
+  schemes, matched every env var key against real `Settings` fields, and
+  posted the exact 6-step manual hand-off as a clearly-labeled list on the
+  issue rather than performing or pretending to perform it.
+- **Review:** QA went one level deeper than the engineer's own
+  verification — rather than trusting the isolated `sed` line, it
+  extracted the real `dockerCommand` string, modeled how Render actually
+  consumes that field (tokenize-then-exec, no extra shell layer), and ran
+  it end-to-end via `subprocess` with a mocked `DATABASE_URL` for both
+  connection-string schemes, confirming the fix survives real execution.
+  It also caught and documented a test-harness pitfall for anyone
+  re-verifying this later (naively running the command through an extra
+  shell layer double-expands the variable and looks broken when it isn't).
+  Confirmed the hand-off list was present and correctly labeled as not
+  performed.
+- **Verification:** `render.yaml` parses as valid YAML; the dialect fix
+  verified correct for both `postgres://` and `postgresql://` inputs, by
+  both engineer and QA, with QA's deeper end-to-end execution test; every
+  env var key matched a real config field; `docs/deployment.md` and the
+  README pointer matched the issue's exact required content and style. No
+  live deployment was attempted or claimed — correctly out of scope for
+  this issue. QA verdict: PASS. Orchestrator closed issue #12 and pushed
+  `524b2bc` to `main`.

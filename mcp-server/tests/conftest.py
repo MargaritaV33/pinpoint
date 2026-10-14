@@ -5,6 +5,7 @@ real MCP protocol (in-memory transport) so `isError` is what a client sees."""
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 import pytest
@@ -128,6 +129,59 @@ def mock_demo_rooms(api: respx.MockRouter) -> None:
     api.get("/rooms/r_atrium/export").respond(text=ATRIUM_EXPORT, headers=text)
     api.get("/rooms/nope").respond(404, json=NOT_FOUND)
     api.get("/rooms/nope/export").respond(404, json=NOT_FOUND)
+
+
+# --- Strict mode for `make mcp-integration` --------------------------------
+# The integration module is skipped when PINPOINT_BASE_URL is empty, which is
+# right for the plain `uv run pytest -rs` of the `mcp` job. In the CI `stack`
+# job a skip would be a silent green, so `make mcp-integration` sets
+# PINPOINT_REQUIRE_INTEGRATION=1 and then a skipped test, or a run in which
+# nothing passed, makes pytest exit non-zero. Without that variable nothing
+# here changes pytest's behaviour.
+REQUIRE_INTEGRATION_ENV = "PINPOINT_REQUIRE_INTEGRATION"
+_strict_skips: list[str] = []
+_strict_passed: list[str] = []
+
+
+def _strict() -> bool:
+    return bool(os.environ.get(REQUIRE_INTEGRATION_ENV, "").strip())
+
+
+def pytest_runtest_logreport(report) -> None:
+    if not _strict():
+        return
+    if report.skipped:
+        reason = report.longrepr[2] if isinstance(report.longrepr, tuple) else str(report.longrepr)
+        _strict_skips.append(reason.removeprefix("Skipped: "))
+    elif report.passed and report.when == "call":
+        _strict_passed.append(report.nodeid)
+
+
+def _strict_problem() -> str | None:
+    if _strict_skips:
+        return (
+            f"{len(_strict_skips)} test(s) were skipped, which counts as a failure when "
+            f"{REQUIRE_INTEGRATION_ENV} is set. Set PINPOINT_BASE_URL to a running Pinpoint "
+            "(`make up`). Skip reason: " + "; ".join(sorted(set(_strict_skips)))
+        )
+    if not _strict_passed:
+        return (
+            f"no test passed (none collected?), which counts as a failure when "
+            f"{REQUIRE_INTEGRATION_ENV} is set. PINPOINT_BASE_URL must point at a running Pinpoint."
+        )
+    return None
+
+
+def pytest_terminal_summary(terminalreporter) -> None:
+    problem = _strict_problem() if _strict() else None
+    if problem:
+        terminalreporter.write_sep("=", "integration run not accepted", red=True, bold=True)
+        terminalreporter.write_line(problem)
+
+
+def pytest_sessionfinish(session, exitstatus) -> None:
+    if _strict() and _strict_problem() and session.exitstatus == 0:
+        session.exitstatus = 1
 
 
 def make_client(**kwargs: Any) -> PinpointClient:

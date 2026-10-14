@@ -77,16 +77,23 @@ bugs, caught before or shortly after they mattered:
   leak fix in a scratch copy and reran the new test suite to confirm it
   would genuinely catch the regression before accepting the coverage as
   real.
-- **The issue #5 mock-vs-real-backend/CORS-port finding.** While wiring the
-  frontend to the real backend, the engineer found that the frontend's
-  actual `npm run dev` port was 8080 (from the Lovable config wrapper), not
-  Vite's assumed default of 5173 — and the real origin was CORS-blocked by
-  default as a result, meaning the frontend was silently still talking to
-  its mock despite the issue's literal goal being "frontend talks to the
-  real backend." QA's first pass correctly failed the issue on exactly
-  this gap rather than treating the wrong port number as a documentation
-  nitpick; the fix pinned the dev server to `5173` with `strictPort: true`
-  so it fails loudly on conflict instead of silently drifting.
+- **The issue #5 env-loading and CORS-port findings.** While wiring the
+  frontend to the real backend, two separate bugs surfaced in sequence, not
+  one. First, Vite's default `envDir` (the `frontend/` project root) never
+  read the repo-root `.env`, so `VITE_API_BASE_URL` was never injected and
+  `index.ts` silently fell back to `MockApiClient` — found and fixed first,
+  by adding `envDir: "../"` to `vite.config.ts`. Only once that fix was in
+  place, and `HttpApiClient` was confirmed as the client actually selected
+  (the mock was no longer in the picture at all), did a second, unrelated
+  bug turn up: the frontend dev server's real default port was 8080 (from
+  the Lovable config wrapper), not Vite's assumed 5173, and
+  `CORS_ORIGINS`'s default didn't cover it — so a real browser on the real
+  origin was loudly CORS-blocked (`400 Disallowed CORS origin`) calling the
+  backend, which is the opposite failure mode from silently using the mock.
+  QA's first pass correctly failed the issue on this second gap rather than
+  treating the wrong port number as a documentation nitpick; the fix
+  pinned the dev server to `5173` with `strictPort: true` so it fails
+  loudly on conflict instead of silently drifting.
 
 **What I would do differently.** The issue #12 incident is the clearest
 recorded lesson: a local simulation of a deploy command — even a faithful

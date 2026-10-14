@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { AUTH_FALLBACK_ERROR, submitAuthForm } from "./auth-form";
-import { ApiError } from "./api/types";
+import { ApiError, type Session } from "./api/types";
 
-function fakeApi(overrides: { signup?: () => Promise<unknown>; login?: () => Promise<unknown> } = {}) {
+// Satisfies submitAuthForm's Pick<ApiClient, "signup" | "login"> parameter
+// type; its fields are never inspected by these tests, only that signup/
+// login was called (and with what args) or that the call rejected.
+const fakeSession: Session = { token: "t", user: { id: "u1", email: "a@b.com", name: "Test" } };
+
+function fakeApi(overrides: { signup?: () => Promise<Session>; login?: () => Promise<Session> } = {}) {
   return {
-    signup: vi.fn(overrides.signup ?? (() => Promise.resolve({}))),
-    login: vi.fn(overrides.login ?? (() => Promise.resolve({}))),
+    signup: vi.fn(overrides.signup ?? (() => Promise.resolve(fakeSession))),
+    login: vi.fn(overrides.login ?? (() => Promise.resolve(fakeSession))),
   };
 }
 

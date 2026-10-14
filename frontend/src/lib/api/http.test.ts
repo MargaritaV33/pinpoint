@@ -248,11 +248,11 @@ describe("http api: RenderImage.url rewrite to an absolute URL", () => {
 
     const api = createHttpApi(BASE);
     const detail = await api.getRoom("r1");
-    expect(detail.images[0].url).toBe(`${BASE}/rooms/r1/images/i1/file`);
+    expect(detail.images[0]!.url).toBe(`${BASE}/rooms/r1/images/i1/file`);
     // Already-absolute URLs are left untouched, not double-prefixed.
-    expect(detail.images[1].url).toBe("https://cdn.example.test/i2/file");
+    expect(detail.images[1]!.url).toBe("https://cdn.example.test/i2/file");
 
     const guestDetail = await api.getGuestRoom("g1");
-    expect(guestDetail.images[0].url).toBe(`${BASE}/rooms/r1/images/i1/file`);
+    expect(guestDetail.images[0]!.url).toBe(`${BASE}/rooms/r1/images/i1/file`);
   });
 });

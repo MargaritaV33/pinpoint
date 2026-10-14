@@ -102,7 +102,7 @@ describe("useImageSrc", () => {
     // exactly once, whether it was still current or already superseded.
     await act(async () => {
       for (const index of [2, 0, 3, 1]) {
-        pendings[index].resolve(createObjectURL());
+        pendings[index]!.resolve(createObjectURL());
       }
       await Promise.all(pendings.map((p) => p.promise));
     });

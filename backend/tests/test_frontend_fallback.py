@@ -76,7 +76,7 @@ def test_health_is_unaffected(frontend_dist: Path) -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "commit": None}
 
 
 def test_without_a_frontend_build_unmatched_paths_404(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -16,6 +16,13 @@ engine included) gets the corrected URL automatically, with no
 Render-specific command-line rewriting needed (see issue #12). A
 `sqlite:///...` URL, or a URL that already names a driver (e.g.
 `postgresql+psycopg://...`), is left untouched.
+
+`render_git_commit` maps to `RENDER_GIT_COMMIT`, which Render injects
+automatically (build time and runtime) with the deployed commit's SHA —
+no Blueprint configuration needed (issue #13). It is unset everywhere else
+(bare `uv run`/`make run`, Compose, CI's own test jobs), so it defaults to
+`None` there; `/health` reports that `None` as-is rather than inventing a
+fallback.
 """
 
 from __future__ import annotations
@@ -35,6 +42,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:8091"
     max_upload_mb: int = 15
     environment: str = "development"
+    render_git_commit: str | None = None
 
     @field_validator("database_url")
     @classmethod

@@ -7,14 +7,23 @@
 # served frontend makes same-origin requests and needs no runtime
 # configuration on Render at all.
 #
-# dockerCommand rewrites DATABASE_URL's scheme from the bare
-# postgresql://(or postgres://) Render's fromDatabase/connectionString
-# returns to postgresql+psycopg://, because backend/pyproject.toml only
-# installs psycopg[binary] (psycopg3), not psycopg2 — SQLAlchemy's default
-# driver for the bare postgresql:// scheme — and passing the connection
-# string through unmodified would crash at boot with
-# ModuleNotFoundError: No module named 'psycopg2'. There is no documented
-# Render-native dialect-select option for this, so the fix lives here.
+# No dockerCommand here, deliberately: this web service runs the
+# Dockerfile's own CMD unmodified, exactly as docker-compose.yaml already
+# does. An earlier version of this file overrode the command with a
+# dockerCommand string that rewrote DATABASE_URL's scheme inline via
+# `sh -c "... uv run uvicorn ..."`. That override failed in production
+# with `sh: 1: ... uv run uvicorn ...: not found` (exit 127) — the whole
+# multi-word dockerCommand string was being treated as a single, not-found
+# executable rather than a parsed shell script. (Confirmed separately: the
+# Dockerfile's runtime stage does install `uv`, and its own CMD — the exec
+# form below, with no dockerCommand override — was verified in a real
+# `docker build` + `docker run` against a live Postgres; see issue #12's
+# reopening comment.) Overriding the command at all was the fragile part;
+# not overriding it removes that whole class of failure. The postgres:// /
+# postgresql:// -> postgresql+psycopg:// dialect normalisation now lives
+# in backend/app/config.py's Settings instead, so every consumer of
+# settings.database_url gets the correct driver with no command-line
+# rewriting needed.
 services:
   - type: web
     name: pinpoint
@@ -22,10 +31,6 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    dockerCommand: >-
-      sh -c "DATABASE_URL=$(printf '%s' \"$DATABASE_URL\" | sed -E
-      's#^postgres(ql)?://#postgresql+psycopg://#') uv run uvicorn
-      app.main:app --host 0.0.0.0 --port 8100"
     healthCheckPath: /health
     envVars:
       - key: JWT_SECRET

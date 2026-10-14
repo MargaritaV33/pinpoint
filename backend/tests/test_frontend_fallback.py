@@ -88,3 +88,22 @@ def test_without_a_frontend_build_unmatched_paths_404(monkeypatch: pytest.Monkey
     response = client.get("/foo/bar")
 
     assert response.status_code == 404
+
+
+# -- the SPA fallback never serves a file outside the build (issue #26 audit) -------
+# `serve_frontend` resolves the requested path and requires it to stay inside
+# FRONTEND_DIST (`is_relative_to`). Without that guard a request for
+# `../secret.txt` would return a file next to the build directory. These pin the
+# guard; they passed before the audit too (no code change), they exist so a
+# later refactor of the fallback cannot drop it unnoticed.
+
+@pytest.mark.parametrize("path", ["/..%2fsecret.txt", "/%2e%2e/secret.txt", "/assets/..%2f..%2fsecret.txt"])
+def test_path_traversal_does_not_leave_the_build_directory(frontend_dist: Path, path: str) -> None:
+    (frontend_dist.parent / "secret.txt").write_text("outside-the-build")
+    client = TestClient(app)
+
+    response = client.get(path)
+
+    assert "outside-the-build" not in response.text
+    # Falls back to the shell (200) or 404s; both are fine, leaking is not.
+    assert response.status_code in (200, 404)

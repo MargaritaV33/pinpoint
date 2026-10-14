@@ -1,4 +1,4 @@
-.PHONY: sync run test frontend-test up down integration e2e sync-agents
+.PHONY: sync run test frontend-test up down integration e2e sync-agents mcp-test
 
 sync:
 	cd backend && uv sync
@@ -42,3 +42,9 @@ sync-agents:
 	mkdir -p .claude/agents .claude/skills
 	cp -r .agents/agents/. .claude/agents/
 	cp -r .agents/skills/. .claude/skills/
+
+# Unit tests of the read-only MCP server (mcp-server/). HTTP is mocked with
+# respx: no backend or Docker needed. The integration test in the same folder
+# is skipped unless PINPOINT_BASE_URL is set; see mcp-server/README.md.
+mcp-test:
+	cd mcp-server && uv run pytest

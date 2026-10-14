@@ -14,6 +14,7 @@ Backend (Python, FastAPI, managed with `uv`):
 - `make up` / `make down` — start / stop the Docker Compose stack
 - `make integration` — integration tests against the running stack
 - `make e2e` — Playwright tests against the compose stack
+- `make mcp-test` — unit tests of the MCP server in `mcp-server/` (HTTP mocked)
 
 Frontend (React + TypeScript + Vite): `cd frontend && npm install && npm run dev`
 

@@ -48,9 +48,9 @@ def _env(name: str, environ: dict[str, str] | os._Environ[str]) -> str:
 @dataclass
 class PinpointClient:
     base_url: str = DEFAULT_BASE_URL
-    token: str = ""
+    token: str = field(default="", repr=False)
     email: str = ""
-    password: str = ""
+    password: str = field(default="", repr=False)
     timeout: float = TIMEOUT_SECONDS
     # (method, path) of every request made, newest last; lets tests and the
     # integration test assert the read-only guarantee without touching the net.

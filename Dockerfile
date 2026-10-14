@@ -58,4 +58,4 @@ COPY --from=frontend-build /frontend/.output/public /app/frontend_dist
 
 WORKDIR /app/backend
 EXPOSE 8100
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]
+CMD ["/app/backend/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]

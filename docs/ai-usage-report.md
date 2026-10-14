@@ -1608,3 +1608,19 @@ standard the project settled on only after being burned once.
   four #26 app fixes (private image cache header, `nosniff`, 128-bit new
   guest tokens, the production secret check) are on `main` but not verified
   in production.
+- **Update, cause identified (from the repo owner, not seen by the
+  orchestrator):** the owner reports that Render has an active incident
+  ("Builds are not starting in all regions, deploys for free services
+  paused", status.render.com). That explains the 500 from the deploy hook and
+  the unresponsive live service in both occurrences described above, so the
+  earlier "unexplained" wording is superseded: the deploy failure is on
+  Render's side. The orchestrator did not open status.render.com itself, so
+  this cause rests on the owner's message. CI run 38636571123 on `cf08ee7`
+  (a log-only push) failed in `deploy` the same way before this message
+  arrived, with every other job green. On the owner's instruction nothing
+  retried the hook after that and polling stopped. **The deploy step is
+  pending Render's recovery:** issue #26 is closed on QA PASS and a green CI
+  `security` job, and its four app fixes stay unverified in production until
+  a deploy succeeds. When Render recovers, one push to `main` or one re-run
+  of the failed `deploy` job (owner or orchestrator) completes it; then
+  check that the live `/health` `commit` equals the pushed SHA.

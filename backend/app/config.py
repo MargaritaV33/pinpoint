@@ -5,12 +5,24 @@ no `.env` file at all. `DATABASE_URL` is accepted (and validated as a plain
 string) even though nothing reads it yet — issue #6 (SQLAlchemy store) needs
 the field to already exist here so it doesn't have to touch this file just
 to start using it.
+
+`database_url` normalises the bare `postgres://`/`postgresql://` scheme
+Render's managed-Postgres `connectionString` returns into
+`postgresql+psycopg://`, since `backend/pyproject.toml` only installs
+`psycopg[binary]` (psycopg3), not `psycopg2` — SQLAlchemy's default driver
+for the bare `postgresql://` scheme. Doing this here, on the Settings field
+itself, means every reader of `settings.database_url` (the SQLAlchemy
+engine included) gets the corrected URL automatically, with no
+Render-specific command-line rewriting needed (see issue #12). A
+`sqlite:///...` URL, or a URL that already names a driver (e.g.
+`postgresql+psycopg://...`), is left untouched.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +35,15 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:8091"
     max_upload_mb: int = 15
     environment: str = "development"
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        if value.startswith("postgres://"):
+            return "postgresql+psycopg://" + value.removeprefix("postgres://")
+        if value.startswith("postgresql://"):
+            return "postgresql+psycopg://" + value.removeprefix("postgresql://")
+        return value
 
     @property
     def cors_origins_list(self) -> list[str]:

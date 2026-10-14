@@ -1258,3 +1258,42 @@ standard the project settled on only after being burned once.
   is accepted and documented, because the owner said that exact command must
   pass, and the `_docs/decisions.md` row is covered by the owner's
   correction, which `AGENTS.md` says to record in `_docs/`.
+- **Engineer input/output:** rewrote only rule 3 of the guard (two
+  commits, `063b633` code and tests, `3918a57` docs). Template names such
+  as `.env.example.bak` are recognised; grep-family patterns, `find -name`
+  patterns, `for` word lists and `echo`/`printf` text count as mentions;
+  `cp <template> .env` (two operands, no `-t`, destination exactly `.env`)
+  is the only permitted write to `.env`; every other word is still checked
+  as a file, and an option the parser does not know is treated as a file
+  and denied. `find` with `-exec`, `-fprint` or `-delete` on an env
+  pattern stays denied (`-delete` was an addition beyond the issue text).
+  `Rule3EnvFiles` moved `cp .env.example .env` to the allowed list and
+  gained a `subTest` for every command in the issue's lists. It updated
+  `docs/permissions.md`, `agent-hooks/README.md` and added one row to
+  `_docs/decisions.md`. It never ran the real `cp .env.example .env` in the
+  repo, since that would overwrite the owner's local env file.
+- **Review:** the first implementation passed the suite unchanged, so the
+  Engineer probed 19 extra edge cases (`cp .env.example .env/`,
+  `cp --target-directory=. .env`, `grep -A3 JWT .env`, `rg -e JWT .env`,
+  `find .env -name x`, `cp $(cat .env) x`) and all behaved as intended.
+  Case-insensitive `.ENV` is allowed because the base-name comparison
+  ignores case, as Windows file names do.
+- **QA input/output (PASS):** a fresh QA session ran `make hooks-test` (65
+  tests), the sync check, a hunk review of the guard diff (only the rule 3
+  region changed; rules 1, 2, 4, 5, `run.sh`, settings and CI untouched),
+  and about 250 piped PreToolUse payloads cross-checked against the
+  pre-change guard extracted with `git archive`. It also ran the exact
+  `cp .env.example .env` through the live hook in a scratch directory with a
+  dummy template, saw `cat .env` there blocked live, and compared the local
+  env file's values with the changed files without printing them. Its
+  non-blocking findings: `for f in .env; do cat "$f"; done` and a
+  backticked `echo .env` substitution, both denied before, are now allowed
+  as a consequence of the mandated exemptions (they belong to the already
+  documented `cat $F` limit), and `cp -a/-r/-l/-s .env.example .env` and
+  `cp .env.example .env.` are allowed, which is harmless. The orchestrator
+  closed the issue.
+- **Verification:** commands above, plus a live hook run. **Not verified:**
+  the CI `hooks` job for this change until it is pushed, Python 3.8 to
+  3.13, `cp` over an existing real `.env` (deliberately not exercised, the
+  overwrite risk is documented, not tested), and the Edit, Write and
+  PowerShell paths to `.env`, which are unhooked.

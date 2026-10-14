@@ -29,15 +29,20 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Public: it is in .env.example and docker-compose.yaml, so it is only
+# acceptable for local development. See `_refuse_default_secret_in_production`.
+DEFAULT_JWT_SECRET = "local-development-secret-change-me"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./pinpoint.db"
-    jwt_secret: str = "local-development-secret-change-me"
+    jwt_secret: str = DEFAULT_JWT_SECRET
     access_token_minutes: int = 60
     cors_origins: str = "http://localhost:5173,http://localhost:8091"
     max_upload_mb: int = 15
@@ -52,6 +57,15 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://"):
             return "postgresql+psycopg://" + value.removeprefix("postgresql://")
         return value
+
+    @model_validator(mode="after")
+    def _refuse_default_secret_in_production(self) -> "Settings":
+        # render.yaml sets ENVIRONMENT=production and generates JWT_SECRET. If
+        # the secret were missing, tokens would be signed with a value anyone
+        # can read in this repository, so fail at startup instead.
+        if self.environment.strip().lower() == "production" and self.jwt_secret == DEFAULT_JWT_SECRET:
+            raise ValueError("JWT_SECRET must be set to a private value when ENVIRONMENT=production")
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:

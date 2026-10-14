@@ -1583,3 +1583,28 @@ standard the project settled on only after being burned once.
 - **Verification:** commands above. **Not verified before the push:** the
   CI `security` job, `make integration`, `make mcp-test` and `make e2e`
   (no `uv` here), and production behaviour after the deploy (checked below).
+- **CI-side proof (orchestrator):** CI run 38634842001 on `dc67e2c`. The new
+  `security` job was green (container job, pinned Semgrep image, report step
+  then the ERROR gate), and so were `backend` (sqlite and postgres),
+  `frontend`, `stack`, `mcp`, `hooks` and `agents-sync`. That closes the
+  "security job not seen green" gap above. Orchestrator closed the issue.
+- **Deploy did not go out, and this is a second occurrence (correcting the
+  earlier "transient" note under #21):** the same run's `deploy` job failed
+  in "Trigger Render deploy" with `curl: (22) The requested URL returned
+  error: 500` within about half a second, and again on one re-run. The live
+  `/health` did not answer at all (six 45-second attempts over about six
+  minutes, then a seventh) after the previous push had deployed `cd03812`
+  and served `200`. The first occurrence, after `88d9dd7`, also had a 500
+  from the hook and 502s from the service, and it cleared by the time of the
+  next push, so the earlier note that it "cleared by itself" fits what was
+  seen but the cause was never established and it has now happened twice.
+  This is unexplained, not ruled out as ours: the hook call fails before
+  Render builds anything, and this push's app changes (a startup refusal
+  under `ENVIRONMENT=production` with the public default JWT secret, which
+  `render.yaml` should not trigger because it generates the secret) never
+  reached Render. Render's dashboard is owner-only: the `pinpoint` service's
+  Events and Logs tabs, and whether the free web service or database is
+  suspended, are the first things to check. Until a deploy succeeds, the
+  four #26 app fixes (private image cache header, `nosniff`, 128-bit new
+  guest tokens, the production secret check) are on `main` but not verified
+  in production.

@@ -12,6 +12,7 @@ Final project for the [AI Dev Tools Zoomcamp 2026](https://github.com/DataTalksC
 - Specification: [`product-spec.md`](product-spec.md)
 - Agent instructions: [`AGENTS.md`](AGENTS.md) · process and roles in [`_docs/`](_docs/)
 - How AI tools were used: [`docs/ai-usage-report.md`](docs/ai-usage-report.md)
+- Deploying to Render: [`docs/deployment.md`](docs/deployment.md)
 
 Status: specification and backlog. Code arrives issue by issue.
 

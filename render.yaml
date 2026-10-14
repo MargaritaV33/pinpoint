@@ -1,0 +1,44 @@
+# Render Blueprint — see docs/deployment.md for the dashboard flow this
+# file drives and issue #12 for the full rationale.
+#
+# No VITE_API_BASE_URL (or any other frontend env var) appears below. That
+# is deliberate: the Dockerfile (issue #8) already bakes
+# VITE_API_BASE_URL="" into the frontend bundle at build time, so the
+# served frontend makes same-origin requests and needs no runtime
+# configuration on Render at all.
+#
+# dockerCommand rewrites DATABASE_URL's scheme from the bare
+# postgresql://(or postgres://) Render's fromDatabase/connectionString
+# returns to postgresql+psycopg://, because backend/pyproject.toml only
+# installs psycopg[binary] (psycopg3), not psycopg2 — SQLAlchemy's default
+# driver for the bare postgresql:// scheme — and passing the connection
+# string through unmodified would crash at boot with
+# ModuleNotFoundError: No module named 'psycopg2'. There is no documented
+# Render-native dialect-select option for this, so the fix lives here.
+services:
+  - type: web
+    name: pinpoint
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: >-
+      sh -c "DATABASE_URL=$(printf '%s' \"$DATABASE_URL\" | sed -E
+      's#^postgres(ql)?://#postgresql+psycopg://#') uv run uvicorn
+      app.main:app --host 0.0.0.0 --port 8100"
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pinpoint-db
+          property: connectionString
+
+databases:
+  - name: pinpoint-db
+    plan: free
+    databaseName: pinpoint
+    user: pinpoint

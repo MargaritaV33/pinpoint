@@ -10,6 +10,14 @@ Postgres, nothing else running. Covers the routers and business rules
 (ownership, closed-room rejections, reopen-on-reply, upload validation,
 export formatting, …) against the in-memory store.
 
+What this layer covers: every business rule the product spec names,
+exercised in-process against the `Store` interface rather than a real
+database — fast enough to run on every change. Rubric: exercises the
+AI-assisted workflow's test-first discipline (criterion 2) and, run
+against the Postgres-backed `backend-test` service below, the same
+database-agnostic store code the CI/CD pipeline's `backend (postgres)`
+job runs (criterion 11).
+
 ```
 make test
 ```
@@ -29,6 +37,13 @@ docker compose --profile test run --rm backend-test
 
 Vitest. No backend running — the suite exercises components and hooks
 against the mock API client (`frontend/src/lib/api/mock.ts`).
+
+What this layer covers: components, hooks, and pure logic (pin coordinate
+math, request shaping in `http.ts`) in isolation, fast enough to run with
+no backend at all. Rubric: exercises the AI-assisted workflow's test-first
+discipline (criterion 2) — the same discipline that caught the reopen-on-
+reply gap during issue #2 and the object-URL leak during issue #7 before
+either reached `main`.
 
 ```
 make frontend-test
@@ -53,6 +68,14 @@ Compose stack over real HTTP with `httpx`, covering auth, room lifecycle
 validation and byte-serving, pin threads (resolve/reopen), approve, export,
 and — in its own file, run last — persistence across a real
 `docker compose restart app`.
+
+What this layer covers: real HTTP, over the network, against the real
+Postgres-backed Compose stack — the same stack the CI/CD pipeline's
+`stack` job brings up, so a pass here is the same signal that job relies
+on before `deploy` ever runs. Rubric: directly serves criterion 11
+(CI/CD) and, via the restart-persistence test, criterion 14
+(reproducibility) — data really does survive a backend restart, not just
+in theory.
 
 It never starts the stack itself. Bring it up first:
 
@@ -89,6 +112,15 @@ without reloading" assertion relies on the app's own 3-second polling
 (`POLL_MS` in `frontend/src/lib/queries.ts`), not on a push update — there
 are no WebSockets in this project (`_docs/decisions.md`) — and no
 `page.reload()` calls appear anywhere in the scenario spec.
+
+What this layer covers: a real browser driving the same user-facing
+scenario as `_docs/test-scenario.md`, through two isolated contexts, the
+closest this project gets to how a studio and a client actually
+experience the app. Rubric: also part of the CI/CD pipeline's `stack` job
+(criterion 11), and `make e2e`'s own up/none/down symmetry — leaving the
+stack exactly as it found it — is itself a reproducibility property
+(criterion 14): the same command behaves correctly whether or not a stack
+was already running.
 
 ```
 make e2e

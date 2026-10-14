@@ -2,62 +2,88 @@
 
 [![CI](https://github.com/MargaritaV33/pinpoint/actions/workflows/ci.yml/badge.svg)](https://github.com/MargaritaV33/pinpoint/actions/workflows/ci.yml)
 
-Client feedback on architectural visualization renders: a studio opens a review
-room, uploads the renders of a round and shares one link; the client drops
-numbered pins on the images and says what to change; the studio replies,
-resolves and re-uploads.
+Archviz studios collect client feedback on renders over email, WhatsApp, and
+screenshots with a red circle drawn on top — comments aren't anchored to the
+image, nobody can tell which ones are done, and the history is gone by the
+next round. Pinpoint gives the client a guest link to drop numbered `fix` /
+`question` / `like` pins directly on each render, and gives the studio back a
+threaded, resolvable, exportable list per room.
+
+The scope is deliberately small: Pinpoint exists to demonstrate the course's
+AI-assisted workflow end to end — spec → backlog → PM/Engineer/QA agents →
+contract-first `openapi.yaml` → tests at every layer → containers → CI/CD →
+deploy — not to compete with Figma or ship a feature-complete product. See
+`_docs/decisions.md`'s "Scope statement" row.
 
 Final project for the [AI Dev Tools Zoomcamp 2026](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp).
 
-- Specification: [`product-spec.md`](product-spec.md)
-- Agent instructions: [`AGENTS.md`](AGENTS.md) · process and roles in [`_docs/`](_docs/)
-- How AI tools were used: [`docs/ai-usage-report.md`](docs/ai-usage-report.md)
-- Deploying to Render: [`docs/deployment.md`](docs/deployment.md)
+## Live demo
 
-Status: specification and backlog. Code arrives issue by issue.
+**<https://pinpoint-muou.onrender.com>**
 
-## Getting started
+Log in as the seeded demo studio:
 
-- `make sync` — install backend dependencies (`uv sync`)
-- `make run` — start the backend with auto-reload
-- `make test` — run the backend test suite
-- `make frontend-test` — install frontend dependencies and run the frontend
-  test suite (also runnable directly via `cd frontend && npm install`)
+- Email: `demo@pinpoint.studio`
+- Password: `pinpoint`
 
-## Running frontend and backend together
+The web service is on Render's free plan and spins down after a period of
+inactivity, so the first request after idling takes roughly 30–60 seconds to
+wake it back up (see `docs/deployment.md`'s "Free plan limits"). Subsequent
+requests are fast.
 
-For local development against the real backend (no mock), run each half in
-its own terminal:
+## Quick start
 
-- Copy `.env.example` to `.env` at the repo root first, if you have not
-  already — it sets `VITE_API_BASE_URL=http://localhost:8091`, which the
-  frontend needs to talk to the real backend instead of its built-in mock.
-- Terminal 1: `make run` (backend on `:8091`).
-- Terminal 2: `cd frontend && npm install && npm run dev` (frontend on
-  Vite's default `:5173`).
+### Prerequisites
 
-This two-terminal recipe is the supported way to run both locally — not a
-`make dev` target (see `_docs/decisions.md`/issue #5 for why). `make
-up`/`make down` (Docker Compose, below) are unrelated to this local-dev
-workflow: SQLite stays the default for this path (`backend/app/config.py`'s
-`DATABASE_URL` default and `backend/app/store/sqlalchemy/engine.py` are
-unchanged), and `make run`/`make test` never need Docker or Postgres.
+- [`uv`](https://docs.astral.sh/uv/) (backend package/venv manager)
+- Node.js 20+ (CI itself runs Node 22; 20 is the floor)
+- Docker with Compose v2 (`docker compose`, not the standalone `docker-compose`)
 
-## Running with Docker Compose
+### Run the backend
 
-`make up` brings up one Postgres-backed Pinpoint from a single two-stage
-image (Node builds the frontend, Python/FastAPI serves the API and the
-built frontend from the same origin — no CORS needed), with no manual steps:
+```sh
+make sync   # cd backend && uv sync
+make run    # cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8091
+```
+
+Serves on `:8091` against SQLite by default
+(`DATABASE_URL=sqlite:///./pinpoint.db`) — no Docker, no Postgres needed.
+
+### Run the frontend against the real backend
+
+Copy `.env.example` to `.env` at the repo root first — it sets
+`VITE_API_BASE_URL=http://localhost:8091`, which the frontend needs to talk
+to the real backend instead of its built-in mock. Then, with the backend
+from the previous step already running:
+
+```sh
+cd frontend && npm install && npm run dev
+```
+
+Vite serves the frontend on `:5173` (pinned via `strictPort: true` in
+`frontend/vite.config.ts`). This two-terminal recipe — backend in one
+terminal, frontend in the other — is the supported way to run both locally;
+there is no `make dev` target (see `_docs/decisions.md` / issue #5 for why).
+
+### Run tests
+
+```sh
+make test            # backend: pytest, in-process against FastAPI's TestClient
+make frontend-test    # frontend: vitest, against the mock API client
+```
+
+### Run the full stack
 
 ```sh
 make up    # docker compose up -d --build --wait
 ```
 
-Once both services report healthy, the app is reachable at
-`http://localhost:${APP_PORT:-8100}` (default `http://localhost:8100`) —
-the first request creates the database tables and loads the demo seed data
-automatically (`SQLAlchemyStore.__init__`: `Base.metadata.create_all`, then
-`_seed()` only if empty — no extra step here).
+One two-stage image (Node builds the frontend, Python/FastAPI serves the API
+and the built frontend from the same origin — no CORS needed), Postgres as a
+second Compose service, no manual steps. Once both services report healthy,
+the app is reachable at `http://localhost:${APP_PORT:-8100}` (default
+`http://localhost:8100`) — the first request creates the database tables and
+loads the demo seed data automatically.
 
 ```sh
 make down  # docker compose down -v
@@ -65,6 +91,29 @@ make down  # docker compose down -v
 
 Stops the stack and removes its Postgres volume, so the next `make up`
 starts from a clean, freshly-seeded database.
+
+### Integration and end-to-end
+
+```sh
+make up            # bring the stack up first — integration doesn't start it
+make integration   # real HTTP against the running stack
+make e2e           # Playwright against a real browser; brings its own stack up/down if none is running
+```
+
+See `docs/testing.md` for what each suite actually covers and how they
+differ.
+
+### Deploy
+
+See `docs/deployment.md` (Render Blueprint, environment variables, rollback)
+and `docs/release-process.md` (what triggers a CI-gated deploy, the smoke
+test, rollback).
+
+## Running with Docker Compose
+
+`make up` brings up one Postgres-backed Pinpoint from a single two-stage
+image (Node builds the frontend, Python/FastAPI serves the API and the
+built frontend from the same origin — no CORS needed), with no manual steps.
 
 **`docker build` alone (no Compose) is not a documented, supported way to
 run the app.** The app needs Postgres, per `_docs/decisions.md`'s "one
@@ -118,3 +167,35 @@ each one.
 | `POSTGRES_USER` | Postgres username | `pinpoint` | Consumed by `docker-compose.yaml` only |
 | `POSTGRES_PASSWORD` | Postgres password | `pinpoint` | Consumed by `docker-compose.yaml` only |
 | `POSTGRES_DB` | Postgres database name | `pinpoint` | Consumed by `docker-compose.yaml` only |
+
+## How this was built with AI
+
+Pinpoint was built with Claude Code running fresh-session PM / Software
+Engineer / QA Engineer role agents per `_docs/process.md`'s lifecycle, with
+the frontend prototyped in Lovable. Start here:
+
+- Specification: [`product-spec.md`](product-spec.md)
+- Process and roles: [`_docs/process.md`](_docs/process.md) ·
+  [`_docs/team/`](_docs/team/) (PM, Software Engineer, QA Engineer role
+  definitions)
+- Decisions already taken: [`_docs/decisions.md`](_docs/decisions.md)
+- Agent instructions: [`AGENTS.md`](AGENTS.md)
+- Full running log, tools used, what went wrong and was caught:
+  [`docs/ai-usage-report.md`](docs/ai-usage-report.md)
+
+## Repository map
+
+- `backend/` — FastAPI + SQLAlchemy backend (routers / models / store / auth)
+- `frontend/` — React + TypeScript + Vite frontend, single API client in
+  `src/lib/api/`
+- `e2e/` — Playwright end-to-end tests against a real browser and a real
+  Compose stack
+- `integration/` — HTTP integration tests against a running Compose stack,
+  its own `uv` project
+- `_docs/` — process, team role definitions, decisions already taken
+- `docs/` — this set of user-facing docs: architecture, testing, deployment,
+  release process, AI usage report
+- `openapi.yaml` — the API contract; change it before changing the backend
+- `render.yaml` — the Render Blueprint (web service + managed Postgres)
+- `docker-compose.yaml` — the local Postgres-backed stack
+- `Dockerfile` — the one two-stage image Compose and Render both run

@@ -4,6 +4,106 @@ Running log of how AI tools were used to build Pinpoint. One entry per step:
 what was asked, what came back, what was reviewed or rejected, how it was
 verified. Consolidated into a narrative before submission.
 
+## Summary
+
+Pinpoint was built almost entirely with **Claude Code**, run as an
+orchestrator spawning fresh-session **PM**, **Software Engineer**, and
+**QA Engineer** role agents for nearly every issue, following the lifecycle
+in `_docs/process.md` and the role definitions in `_docs/team/`. The one
+deliberate exception is the frontend: it was first prototyped in
+**Lovable** (issue #2, imported from a private `render-review` repo) to get
+a good-looking, working UI fast, then adapted to this repo's conventions
+(npm tooling, a single API client in `src/lib/api/`, the `VITE_API_BASE_URL`
+env var) rather than built from scratch.
+
+**What worked.** The PM/Engineer/QA split, with a fresh session per role and
+per step, meant no single session's self-report was ever trusted as the
+final word — QA re-verified everything independently, often by re-running
+the engineer's own commands from scratch, diffing against the real
+repository state, or reproducing a fix in a scratch copy to confirm it
+would actually catch a regression. This caught real problems before they
+reached `main`, not just stylistic nits:
+
+- **Issue #4** (backend from the contract): QA cross-checked every
+  auth/ownership/business-rule claim with its own live curls rather than
+  trusting the engineer's report, and confirmed a real gap in
+  `openapi.yaml` itself (`approveRound` missing a documented 404).
+- **Issue #6** (SQLAlchemy persistence): QA didn't just read the
+  restart-persistence fix, it reproduced the full restart proof itself
+  (create data, kill every process on the port, restart, confirm no
+  duplicates/no crash) and `sha256sum`-verified the replacement seed images
+  were byte-for-byte identical, not just same-named.
+- **Issue #8** (Dockerfile/Compose): QA reverted the engineer's
+  parent-then-child seeding fix and reran the Postgres suite to confirm the
+  `ForeignKeyViolation` bug it fixed was genuinely real, and separately
+  reproduced the disclosed `npm ci` lockfile gap in a scratch build before
+  accepting the `npm install` deviation.
+- **Issue #9** (integration tests): QA independently reproduced the
+  `frontend/package-lock.json` reversion risk the engineer had flagged
+  (confirmed `npm install` really does strip the Linux-only optional
+  entries again), and used `docker inspect` container-start timestamps to
+  prove the persistence test's restart was genuinely real, not a no-op.
+- **Issue #10** (Playwright e2e): QA ran the full suite three times to rule
+  out flakiness, verified both directions of the `make e2e` start/teardown
+  symmetry itself, and deliberately broke a different assertion than the
+  engineer had to confirm the trace/report mechanism generalizes.
+- **Issue #13** (continuous deployment): QA extended the engineer's
+  mocked-`curl`/`jq` poll-loop harness with three failure modes the
+  engineer hadn't tried (non-JSON body, connection failure, HTTP 500), and
+  settled an open question about `autoDeployTrigger`'s type by fetching
+  Render's own Blueprint JSON schema rather than reasoning about it.
+
+**What went wrong and was caught.** Three incidents stand out as genuine
+bugs, caught before or shortly after they mattered:
+
+- **The issue #12 Render deploy incident.** The first deploy attempt's
+  `render.yaml` used a `dockerCommand` override to rewrite `DATABASE_URL`'s
+  scheme inline. It was verified locally by simulating the command string
+  in isolation (a `subprocess`/`shlex` test) — and still crashed in
+  production on the very first real deploy, with
+  `sh: 1: DATABASE_URL="postgresql://...@dpg-.../pinpoint_xxuj" uv run
+  uvicorn ...: not found` (exit code 127). The fix removed the
+  `dockerCommand` override entirely and moved the `postgres://` /
+  `postgresql://` → `postgresql+psycopg://` normalization into a
+  `Settings` field validator in `backend/app/config.py`, verified this
+  time with a real `docker build` + `docker run` against live Postgres —
+  not simulated.
+- **The issue #7 image-caching/object-URL-leak bug.** `useImageSrc.ts`'s
+  authenticated-fetch-to-object-URL pattern was discarding, instead of
+  revoking, an object URL from an in-flight fetch that resolved after its
+  effect had already been cancelled (e.g. rapid image switching) — a real
+  memory leak. A separate stale-cache issue was fixed in the same pass
+  with `cache: "no-cache"` (deliberately not `"no-store"`). QA reverted the
+  leak fix in a scratch copy and reran the new test suite to confirm it
+  would genuinely catch the regression before accepting the coverage as
+  real.
+- **The issue #5 mock-vs-real-backend/CORS-port finding.** While wiring the
+  frontend to the real backend, the engineer found that the frontend's
+  actual `npm run dev` port was 8080 (from the Lovable config wrapper), not
+  Vite's assumed default of 5173 — and the real origin was CORS-blocked by
+  default as a result, meaning the frontend was silently still talking to
+  its mock despite the issue's literal goal being "frontend talks to the
+  real backend." QA's first pass correctly failed the issue on exactly
+  this gap rather than treating the wrong port number as a documentation
+  nitpick; the fix pinned the dev server to `5173` with `strictPort: true`
+  so it fails loudly on conflict instead of silently drifting.
+
+**What I would do differently.** The issue #12 incident is the clearest
+recorded lesson: a local simulation of a deploy command — even a faithful
+one, with real `subprocess` calls against the real command string — is not
+the same as running the real artifact (the built Docker image) under the
+real target platform's own invocation semantics. The bug lived entirely in
+that gap, and no amount of correctly reasoning about the command string in
+isolation would have caught it; only actually building and running the
+image, the way issue #12's reopening fix and issue #17 both later did,
+surfaces that class of failure. Given the chance to do it again, I would
+insist on a real build-and-run verification against the actual deployment
+artifact before calling any infra-facing issue done, rather than accepting
+an isolated command-string simulation as sufficient evidence — the same
+standard the project settled on only after being burned once.
+
+## Appendix: per-issue log
+
 ## 2026-10-12 — Spec and bootstrap
 
 - **Tool:** Claude (chat) as brainstorming partner, one question at a time.

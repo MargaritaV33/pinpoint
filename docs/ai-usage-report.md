@@ -1704,3 +1704,52 @@ deploy of this batch and is logged in the entries below it.
   access log, `actionlint` (not installed), and the new `deploy` step on
   real GitHub runners (the dry run replaces three GitHub expressions with
   local placeholders and shims `jq`).
+
+### Issue #38, part 4 (live cold-start diagnosis)
+
+- **PM input/output:** covered by the groomed issue above. The PM's part 4
+  criteria made the measurement honest in advance: read-only `GET /health`
+  only, a cold sample counts only with an idle gap of 15 minutes or more and
+  a clearly slower first request, "N of 5" instead of padding, and a
+  statement that Render's own startup log was not observed.
+- **Engineer input/output:** the first engineer session started the sampler
+  (5 warm samples, then up to 5 cold samples 16 minutes apart, a background
+  script that only requested `/health`) and made a local startup capture,
+  but was cut off before it wrote anything, and its transcript could not be
+  resumed. The orchestrator had the sampler's raw numbers from its output
+  and passed them in the next brief; a fresh engineer re-captured the local
+  startup itself instead of trusting the old summary (4.17 s to the first
+  uvicorn line, 4.39 s to the first local 200, matching the earlier
+  claim) and wrote `ops/diagnosis-2026-10-15-cold-start.md` (`7b60015`).
+  Result: 4 of 5 attempts cold (32.37 to 32.76 s against a warm 0.275 to
+  0.281 s, time spent before the first byte), cold3 answered in 0.284 s
+  after the same 16-minute gap and is listed as "gap met, not observed cold"
+  with its cause unknown. No defect found; no code changed by part 4.
+- **on-call-responder:** it has no shell, so it analysed the tables and
+  wrote the Analysis and Recommendation (keep the free plan and document
+  the wake-up; the other two options are weighed with sources). It read
+  Render's free-plan page through a fetch tool's summary and marked those
+  facts unconfirmed; it found no price, so it states none. Its text was
+  saved unaltered and inserted verbatim (`7b317f9`).
+- **Review:** the engineer then checked the agent's text against the doc's
+  own tables and found four inaccuracies: an `appconnect` range that
+  ignored cold4 (0.054 s), a sentence calling 0.284 s both "above" and
+  "inside" the warm range, a rounded ratio (116.5), and a cold5 offset that
+  depends on the reference sample. The orchestrator confirmed the first two
+  against the tables. The agent's sentences were not edited; a dated
+  "Corrections after review" section after the recommendation states the
+  correct values and that no conclusion changes (`82d123b`). The engineer
+  also replaced the runbook's "pending measurement" lines and the README's
+  "roughly 30-60 seconds" with "about 33 seconds (4 of 5 attempts, 15 Oct
+  2026)" (`9b8b822`). `docs/deployment.md` was left for the owner: it is
+  outside the groomed file list.
+- **Verification:** QA PASS. QA recomputed all statistics, compared all 20
+  timing values with the sampler output, opened each file:line cited in the
+  startup section, byte-compared the agent text with the saved original,
+  and re-ran the regression checks (46 relative links, no secret patterns,
+  authorship, 150 backend tests). **Not verifiable from the repo:** that
+  nothing else touched the service during the 07:20 to 08:42 UTC window and
+  that the threshold was fixed before the cold results (both rest on the
+  sampler's operator, and the report says so). Render's dashboard log for a
+  cold start was never seen; the owner could paste it to close the roughly
+  28 s that the local start does not explain.

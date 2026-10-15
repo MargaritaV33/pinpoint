@@ -10,10 +10,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+from app.access_log import install_access_log
 from app.config import settings
 from app.routers import auth, guest, health, images, pins, rooms
 
 app = FastAPI(title="Pinpoint API")
+
+# JSON access log + X-Request-Id on every response (issue #38, ops/observability.md).
+install_access_log(app)
 
 app.add_middleware(
     CORSMiddleware,

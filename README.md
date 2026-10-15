@@ -282,7 +282,7 @@ PINPOINT_EMAIL=demo@pinpoint.studio PINPOINT_PASSWORD=pinpoint claude   # in the
 Claude Code asks once to approve the project's `pinpoint` server, which `.mcp.json`
 runs as `uv run --directory mcp-server pinpoint-mcp`. Then ask "how many open fix
 pins are in each demo room?" (details: [`mcp-server/README.md`](mcp-server/README.md)).
-Tests: `make hooks-test` (the hooks in `agent-hooks/`), `make mcp-test` (the MCP server).
+Tests: `make hooks-test` (the hooks in `agent-hooks/`), `make mcp-test` (the MCP server, HTTP mocked), `make mcp-integration` (needs `make up`; the MCP integration tests against the live stack).
 
 ## Security and operations
 

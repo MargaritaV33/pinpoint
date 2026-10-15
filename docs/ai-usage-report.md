@@ -1624,3 +1624,83 @@ standard the project settled on only after being burned once.
   a deploy succeeds. When Render recovers, one push to `main` or one re-run
   of the failed `deploy` job (owner or orchestrator) completes it; then
   check that the live `/health` `commit` equals the pushed SHA.
+- **Update 2026-10-15, deploy landed (orchestrator, read-only check):**
+  status.render.com now shows the incident resolved (14 Oct 22:18 UTC; the
+  page does not say when free-instance deploys resumed). `gh run view
+  38634842001` shows the owner re-ran the `deploy` job (attempt 3, started
+  06:38 UTC on 15 Oct): "Trigger Render deploy" succeeded and the wait step
+  was cancelled. A single `GET /health` then returned `200` with
+  `commit` `51dfe85...`, the tip of `main`. So the four #26 app fixes are
+  served in production. Not verified there: demo login and the guest link
+  (no request other than `/health` was made). The orchestrator made no hook
+  call at any point.
+
+## 2026-10-15 — Issue #38: Operational runbook, incident records and live diagnosis
+
+Opened by the orchestrator from the owner's five-part brief (runbook, two
+postmortems, executable deploy hint, live cold-start diagnosis, minimal
+observability). Parts 1, 2, 3 and 5 are logged here first; part 4 needs the
+deploy of this batch and is logged in the entries below it.
+
+- **PM input/output:** input was the brief verbatim plus facts the orchestrator
+  had established (production URL, the status.render.com incident window,
+  the failed run ids, the owner's 15 Oct re-run) and the limits of the
+  agents: no Render dashboard access, and `on-call-responder` has only Read,
+  Grep, Glob and WebFetch. Output was a four-section issue with checkable
+  criteria in five parts plus a Delivery block. The PM ordered the work 1, 2,
+  3, 5, then 4 so the diagnosis measures the build that contains the
+  observability change; required "owner to confirm" instead of guessed
+  database-access facts; required the Render startup log to be reported as
+  "not observed" with a labelled local capture; set cold samples to count
+  only with a 15-minute idle gap and a clearly slower first request, and
+  "N of 5" instead of padding; and added two things the brief did not say:
+  the access log must record the route template, never the concrete path,
+  because guest tokens are in URL paths, and an incoming `X-Request-Id` is
+  accepted only as 1-64 characters of `A-Za-z0-9._-`. It also parked three
+  out-of-scope ideas in the local-only ideas file. Reviewed by the
+  orchestrator against the brief: nothing dropped. Two PM questions stay
+  with the owner: whether the `on-call-responder` definition should point at
+  the runbook (left out to stay off agent files, see #36) and how the
+  managed Postgres is reached (unknown from the repo).
+- **Engineer input/output:** input was the groomed issue, parts 1, 2, 3, 5
+  only, no push, no requests to production, local stubs only for the deploy
+  dry run. Output was nine commits (`5e3d18f`..`ff455d5`): `ops/runbook.md`
+  with a provider-first decision tree, two postmortems and an updated
+  `ops/incidents/README.md`, the `deploy` job hint with
+  `ops/dry-run-deploy-hint.py`, `openapi.yaml` documenting `X-Request-Id`
+  on all 20 operations before the backend, `backend/app/access_log.py` with
+  52 new tests, and `ops/observability.md`. Decisions: the hint prints on a
+  5xx or no response from the hook and on a `/health` that never answered or
+  answered 5xx, not on 4xx and not on a stale commit (that prints a `NOTE:`);
+  the middleware wraps the built stack so the 500 and CORS preflight also get
+  an id and a log line; the engineer also found that uvicorn's own access log
+  prints the full URL with the query string, which would put guest tokens
+  in Render's log beside the sanitised line, and disabled that logger in
+  `install_access_log` with a test.
+- **Review:** orchestrator checked the diff scope (14 files, nothing in
+  `frontend/`, `render.yaml`, `_docs/` or this file), authorship and
+  trailers (none), and re-ran the backend suite (150 passed). Not taken
+  at face value: the postmortem timelines. QA flagged three overclaims in
+  the outage postmortem: the Summary named Render's incident as the cause
+  although the first failure began under two minutes before the 19:32
+  listing and hooks inside the window had succeeded; a timeline row cited
+  the orchestrator's hand-off as a source and asserted `51dfe85` was served;
+  and one time ("about 19:31 onward") was inferred. All three were sent back
+  and fixed in `dcffd6a`: later failures are "consistent with" the incident,
+  the first only "consistent with, not established", and the served commit
+  is left to the part 4 `GET /health`. The orchestrator's own `GET /health`
+  (200, `51dfe85`) is recorded under #26, not used as a postmortem source.
+- **Verification:** QA PASS (parts 1, 2, 3, 5 and the pre-push Delivery
+  items; part 4 and the push marked pending, not failed). QA re-ran
+  `backend/.venv/Scripts/pytest.exe` (150 passed; `uv` is not installed
+  here), ran `ops/dry-run-deploy-hint.py` (cases a-f plus two extras, all
+  pass; the runner checks the hook token never appears in output), and made
+  its own probes against a local uvicorn: no token or query string in any
+  log line including uvicorn's, the id on 200/401/404/422/SPA/static/CORS
+  preflight/500, bad ids replaced and not echoed. It checked at least five
+  postmortem facts against `gh run view` attempts, `git log`, issue #12 and
+  status.render.com. **Not verified at this point:** `make test`,
+  `make integration`, `make e2e` (no `uv`), the Docker image run of the
+  access log, `actionlint` (not installed), and the new `deploy` step on
+  real GitHub runners (the dry run replaces three GitHub expressions with
+  local placeholders and shims `jq`).

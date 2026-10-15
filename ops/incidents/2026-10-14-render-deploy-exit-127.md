@@ -6,7 +6,9 @@ brackets. Where the repo does not record something it says so.
 
 Related: [runbook](../runbook.md) ·
 [the platform outage the same day](2026-10-14-render-platform-outage.md)
-(a different failure with a similar-looking symptom: a red `deploy` job).
+(a different failure, seen differently: there the CI `deploy` job went red at
+"Trigger Render deploy" with HTTP 500 and `/health` did not answer; here the
+`deploy` job did not exist yet and the crash showed in the Render dashboard log).
 
 ## Summary
 

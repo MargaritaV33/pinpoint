@@ -7,7 +7,9 @@ repo does not record something it says so.
 
 Related: [runbook, decision tree](../runbook.md) ·
 [the exit-127 incident the same day](2026-10-14-render-deploy-exit-127.md)
-(a different cause: our configuration, not the provider).
+(a different cause and a different symptom: our configuration, seen as a crash
+in the Render dashboard log before the CI `deploy` job existed, not the
+provider).
 
 ## Summary
 

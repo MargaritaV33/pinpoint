@@ -9,6 +9,11 @@ info:
     implemented against it, and the frontend's single API client
     (`frontend/src/lib/api/`) has both a mock and an HTTP implementation of
     it.
+
+
+    Every response, listed here or not, carries an `X-Request-Id` header that
+    identifies the request in the service's access log; callers may send their
+    own (see the `RequestId` parameter).
   license:
     name: Proprietary
 servers:
@@ -46,6 +51,8 @@ paths:
         the same way `/auth/login` does. No authentication required.
       tags: [Studio auth]
       security: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       requestBody:
         required: true
         content:
@@ -55,18 +62,27 @@ paths:
       responses:
         "201":
           description: Account created and signed in.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Session"
         "400":
           description: The email is blank or not a valid address, or the password is blank.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
           description: An account with this email already exists.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -79,6 +95,8 @@ paths:
       description: Starts a session for an existing studio user. No authentication required.
       tags: [Studio auth]
       security: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       requestBody:
         required: true
         content:
@@ -88,12 +106,18 @@ paths:
       responses:
         "200":
           description: Signed in.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Session"
         "401":
           description: The email or password is incorrect.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -105,11 +129,19 @@ paths:
       summary: End the current studio session
       description: Invalidates the bearer token used to call it. No request body.
       tags: [Studio auth]
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       responses:
         "204":
           description: Session ended. No content.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -125,15 +157,23 @@ paths:
         invalid token) as "not signed in" and returns `null` rather than
         throwing.
       tags: [Studio auth]
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
           description: The signed-in studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudioUser"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -145,9 +185,14 @@ paths:
       summary: List the signed-in studio's rooms
       description: Rooms owned by the caller, each with its current open-pin count.
       tags: [Studio rooms]
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
           description: The caller's rooms.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -156,6 +201,9 @@ paths:
                   $ref: "#/components/schemas/RoomSummary"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -165,6 +213,8 @@ paths:
       summary: Create a room
       description: Creates a room owned by the caller, with a fresh guest token.
       tags: [Studio rooms]
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       requestBody:
         required: true
         content:
@@ -174,18 +224,27 @@ paths:
       responses:
         "201":
           description: The created room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Room"
         "400":
           description: "`title` or `clientName` is blank."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -201,22 +260,32 @@ paths:
         in the returned `RoomDetail`.
       tags: [Studio rooms]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/RoomId"
       responses:
         "200":
           description: The room, its images, and its pins (each with its comments).
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RoomDetail"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such room, or it belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -229,22 +298,32 @@ paths:
       description: Closes the room. Closed rooms reject further writes from either side.
       tags: [Studio rooms]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/RoomId"
       responses:
         "200":
           description: The closed room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Room"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such room, or it belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -260,22 +339,32 @@ paths:
         `text/plain`, not JSON.
       tags: [Studio rooms]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/RoomId"
       responses:
         "200":
           description: The formatted export text.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             text/plain:
               schema:
                 type: string
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such room, or it belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -291,6 +380,7 @@ paths:
         (`validation.ts`'s `MAX_RENDER_BYTES` / `ALLOWED_RENDER_TYPES`).
       tags: [Studio images]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/RoomId"
       requestBody:
         required: true
@@ -309,42 +399,63 @@ paths:
       responses:
         "201":
           description: The uploaded image's record.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RenderImage"
         "400":
           description: "`title` is blank."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: The room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such room, or it belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "413":
           description: The file exceeds 15 MB.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "415":
           description: The file's content type is not `image/jpeg` or `image/png`.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -359,6 +470,7 @@ paths:
         old one is flagged `superseded` here instead of being replaced.
       tags: [Studio images]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/ImageId"
       requestBody:
         required: true
@@ -369,24 +481,36 @@ paths:
       responses:
         "200":
           description: The updated image record.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RenderImage"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: The image's room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such image, or its room belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -409,6 +533,7 @@ paths:
         response body (e.g. via `URL.createObjectURL`).
       tags: [Studio images]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/RoomId"
         - $ref: "#/components/parameters/ImageId"
       responses:
@@ -418,6 +543,8 @@ paths:
             the browser caches renders across polls instead of refetching the
             bytes every time.
           headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
             ETag:
               description: Opaque identifier for this exact file version.
               schema:
@@ -444,12 +571,18 @@ paths:
                 format: binary
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such image in this room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -468,6 +601,7 @@ paths:
       tags: [Guest]
       security: []
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/GuestToken"
         - $ref: "#/components/parameters/ImageId"
       responses:
@@ -477,6 +611,8 @@ paths:
             the browser caches renders across polls instead of refetching the
             bytes every time.
           headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
             ETag:
               description: Opaque identifier for this exact file version.
               schema:
@@ -502,6 +638,9 @@ paths:
           description: >
             No such image, the guest token does not match any room, or the
             image does not belong to that room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -514,6 +653,7 @@ paths:
       description: Sets a `fix` or `question` pin's status. `like` pins have no status.
       tags: [Studio pins]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/PinId"
       requestBody:
         required: true
@@ -524,30 +664,45 @@ paths:
       responses:
         "200":
           description: The updated pin, with its comments.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Pin"
         "400":
           description: The pin's type is `like` — like pins have no status.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: The pin's room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such pin, or its room belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -563,6 +718,7 @@ paths:
         pin the studio itself resolved.
       tags: [Studio pins]
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/PinId"
       requestBody:
         required: true
@@ -573,30 +729,45 @@ paths:
       responses:
         "201":
           description: The created comment.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Comment"
         "400":
           description: "`text` is blank."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
           description: The bearer token is missing or invalid.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: The pin's room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such pin, or its room belongs to a different studio user.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -613,16 +784,23 @@ paths:
       tags: [Guest]
       security: []
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/GuestToken"
       responses:
         "200":
           description: The room, its images, and its pins (each with its comments).
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RoomDetail"
         "404":
           description: The guest token does not match any room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -639,6 +817,7 @@ paths:
       tags: [Guest]
       security: []
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/GuestToken"
       requestBody:
         required: true
@@ -649,6 +828,9 @@ paths:
       responses:
         "201":
           description: The created pin, with its first comment.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -657,24 +839,36 @@ paths:
           description: >
             `authorName` or `text` is blank, or `x`/`y` is not a finite
             number in `[0, 100]`.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: The room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: "`imageId` does not belong to this room."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
           description: The image has been superseded.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -694,6 +888,7 @@ paths:
       tags: [Guest]
       security: []
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/GuestToken"
         - $ref: "#/components/parameters/PinId"
       requestBody:
@@ -707,24 +902,36 @@ paths:
           description: >
             The created comment. If it reopened a resolved pin, the pin's
             status is `open` in any subsequent fetch of it.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Comment"
         "400":
           description: "`authorName` or `text` is blank."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: The room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: The pin does not belong to this room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -742,6 +949,7 @@ paths:
       tags: [Guest]
       security: []
       parameters:
+        - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/GuestToken"
       requestBody:
         required: true
@@ -752,18 +960,27 @@ paths:
       responses:
         "200":
           description: The approved room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Room"
         "403":
           description: The room is closed.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
           description: No such room, or the guest token does not match any room.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -779,15 +996,35 @@ paths:
         triggered it. No authentication required.
       tags: [Health]
       security: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
           description: The service is up.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
 
 components:
+  headers:
+    XRequestId:
+      description: >
+        Identifier of this request, also written to the access log line of the
+        request (`ops/observability.md`). Present on every response of the
+        service, including `404`, `405`, `422`, `500` and the static frontend
+        and SPA fallback responses, whether or not the response is listed in
+        this contract. If the request carried a valid `X-Request-Id`, that
+        value is returned unchanged; otherwise it is a freshly generated
+        32-character lowercase hex string.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._-]{1,64}$'
+        example: 3f2a9c1e5b7d4c0a8e6f1b2d9a4c7e30
+
   securitySchemes:
     bearerAuth:
       type: http
@@ -798,6 +1035,21 @@ components:
         segment instead (see the `GuestToken` parameter).
 
   parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: >
+        Optional caller-chosen request id, for tracing one request through the
+        logs. Accepted only if it is 1 to 64 characters from `A-Z a-z 0-9 . _ -`
+        (`^[A-Za-z0-9._-]{1,64}$`); the service then echoes it in the response
+        header `X-Request-Id` and writes it to the access log. Anything else
+        (empty, longer than 64, spaces, control characters, quotes, non-ASCII)
+        is not an error: it is discarded, never echoed or logged, and replaced
+        by a generated id.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._-]{1,64}$'
     RoomId:
       name: roomId
       in: path

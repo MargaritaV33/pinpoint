@@ -165,7 +165,9 @@ differ.
 
 See `docs/deployment.md` (Render Blueprint, environment variables, rollback)
 and `docs/release-process.md` (what triggers a CI-gated deploy, the smoke
-test, rollback).
+test, rollback). When production looks wrong, start at
+[`ops/runbook.md`](ops/runbook.md) (health check, logs, "is it our app, Render or
+the database?" decision tree); past incidents are in `ops/incidents/`.
 
 ## Running with Docker Compose
 
@@ -258,6 +260,8 @@ the frontend prototyped in Lovable. Start here:
 - `docs/` — this set of user-facing docs: architecture, testing, deployment,
   release process, AI usage report
 - `openapi.yaml` — the API contract; change it before changing the backend
+- `ops/` — operations: [`runbook.md`](ops/runbook.md), blameless
+  [`incidents/`](ops/incidents/README.md), [`observability.md`](ops/observability.md)
 - `render.yaml` — the Render Blueprint (web service + managed Postgres)
 - `docker-compose.yaml` — the local Postgres-backed stack
 - `Dockerfile` — the one two-stage image Compose and Render both run

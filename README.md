@@ -127,7 +127,8 @@ make frontend-test    # frontend: vitest, against the mock API client
 `make frontend-test` also runs `npm install`, so it has the same
 lockfile-rewriting effect described above — run
 `git checkout -- frontend/package-lock.json` afterward if you're about to
-run `make up`.
+run `make up` or `make e2e` (`make e2e` builds its own stack when none is
+running, and that build fails at `npm ci` on a rewritten lockfile).
 
 ### Run the full stack
 
@@ -164,6 +165,10 @@ make up            # bring the stack up first — integration doesn't start it
 make integration   # real HTTP against the running stack
 make e2e           # Playwright against a real browser; brings its own stack up/down if none is running
 ```
+
+Restore `frontend/package-lock.json` first (`git checkout -- frontend/package-lock.json`)
+if `npm install` or `make frontend-test` ran earlier: `make e2e` builds the same
+image as `make up`, and with no stack running it fails at `npm ci` otherwise.
 
 See `docs/testing.md` for what each suite actually covers and how they
 differ.

@@ -89,6 +89,8 @@ make run    # cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 
 
 Serves on `:8091` against SQLite by default
 (`DATABASE_URL=sqlite:///./pinpoint.db`) — no Docker, no Postgres needed.
+`make run` keeps the terminal until you stop it with Ctrl+C, so open a second
+terminal for the next steps (`curl`, the frontend).
 There's no route at `/` (API-only, `404` is expected); check it's up with
 `curl http://localhost:8091/health` instead. A one-time
 `WatchFiles detected changes in '.venv\...'. Reloading...` line on first

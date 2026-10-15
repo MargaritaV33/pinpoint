@@ -100,6 +100,16 @@ room they don't own — the ownership check (`room.owner_id` against the
 authenticated user's id) is a router-level business rule, not part of the
 auth scheme itself.
 
+### Observability
+
+Every request gets an `X-Request-Id` (kept from the caller if it is a safe
+1-64 character token, else generated) and one JSON access-log line on stdout
+(`backend/app/access_log.py`). Because guest tokens are path segments, the line
+carries the route template, never the concrete URL, and never the query
+string, headers or bodies. Format, request-id rules and what does not exist
+(metrics, tracing, alerting): [`ops/observability.md`](../ops/observability.md).
+Operating the live service: [`ops/runbook.md`](../ops/runbook.md).
+
 ## Data model
 
 Five tables carry the product's actual data, defined in

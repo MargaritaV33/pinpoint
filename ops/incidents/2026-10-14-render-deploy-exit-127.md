@@ -27,7 +27,7 @@ running it for real. [issue #12, reopening comment and fix comment]
 | 14 Oct, 09:05 | QA passes the issue after its own simulation: the command was split into arguments and run through `subprocess` with a mocked `DATABASE_URL`. | issue #12 comment |
 | 14 Oct, 09:06 | Issue #12 closed on QA PASS. Creating the Blueprint needed the owner's dashboard access and was left to the owner by design. | issue #12 comments |
 | 14 Oct, before 09:19 | The first Render deploy runs and fails. The exact time of the Blueprint apply and of the crash is **not recorded**. | not recorded |
-| 14 Oct, 09:19 | The owner reopens issue #12 with the dashboard log: `sh: 1: DATABASE_URL="postgresql://pinpoint:...@dpg-.../pinpoint_..." uv run uvicorn app.main:app --host 0.0.0.0 --port 8100: not found`, then `==> Exited with status 127`. The credentials in that line are elided in the issue. | issue #12 comment |
+| 14 Oct, 09:19 | The owner reopens issue #12 with the dashboard log: `sh: 1: DATABASE_URL="<connection string>" uv run uvicorn app.main:app --host 0.0.0.0 --port 8100: not found`, then `==> Exited with status 127`. The connection string is left out here; it holds credentials. | issue #12 comment |
 | 14 Oct, 09:26 | Fix committed: `406a48d` removes the `dockerCommand`; `5117c40` normalises `postgres://` and `postgresql://` to `postgresql+psycopg://` in `backend/app/config.py`, with 4 unit tests. The engineer builds and runs the real image against Postgres with no command override and gets a healthy `/health`. | git log, issue #12 comment |
 | 14 Oct, 09:35 | QA repeats the real build and run independently and passes the fix. | issue #12 comment |
 | 14 Oct, 09:36 | Issue #12 closed again. | issue #12 |

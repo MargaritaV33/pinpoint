@@ -285,7 +285,6 @@ Tests: `make hooks-test` (the hooks in `agent-hooks/`), `make mcp-test` (the MCP
   [`ops/diagnosis-2026-10-15-cold-start.md`](ops/diagnosis-2026-10-15-cold-start.md).
 - Semgrep scan: needs Docker and a clean `git archive` export of the tracked files, never a working tree holding `.env` or `_local/`. Commands:
   "How to reproduce" in [`security/semgrep-report.md`](security/semgrep-report.md#how-to-reproduce); documented result: 19 findings, none from `p/secrets`.
-  In a Claude Code session the Bash hook blocks the Git Bash form (its `--exclude .env` trips rule 3, `docs/permissions.md`): run it in your own terminal.
 
 ## Repository map
 

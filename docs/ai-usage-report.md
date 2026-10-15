@@ -109,6 +109,131 @@ artifact before calling any infra-facing issue done, rather than accepting
 an isolated command-string simulation as sufficient evidence — the same
 standard the project settled on only after being burned once.
 
+### Attempt 2: extension pack, security and operations
+
+The second phase added an agent extension pack (four subagents, three skills,
+a read-only MCP server, hooks; `docs/agent-extension-pack.md`), a security
+scan and audits (`security/`), and an operations runbook with incident records
+and a live diagnosis (`ops/`). Every number below says in the same sentence
+how it was obtained; a number that was not measured says so.
+
+**What the pack changed about how the agents worked.** The lifecycle itself did
+not change: the PM, Engineer and QA roles and the fresh session per step
+already existed (`_docs/process.md`), and the subagent and skill files only
+name that process (issue #18 describes them as the tooling "this exact
+lifecycle already runs on"). What changed is that the process became
+checkable, and that the agents' own tooling became something QA could test.
+Concrete cases from the appendix:
+
+- **Issue #18.** The Engineer could not call the new skills from its own
+  session, because that session's roster of skills and subagents was fixed at
+  its start. It said so and ran the real `claude` CLI in fresh `claude -p`
+  sessions instead. QA reproduced the limitation before accepting the
+  workaround, and then introduced a one-byte difference between `.agents/`
+  and `.claude/` to prove that `scripts/check-agents-sync.sh` fails when the
+  trees drift.
+- **Issue #22.** The hooks blocked the agents' own work: the env-file rule
+  also denied `cp .env.example .env`, the README's first setup step, so the
+  Engineer used the PowerShell tool for a dummy file. The owner corrected the
+  rule in issue #23 (row 23 of `_docs/decisions.md`). A guardrail that blocks
+  the documented setup gets worked around, which is why the correction is
+  recorded as a decision.
+- **Issue #19.** The MCP server's live-demo criterion was written so that
+  it could not be met by invention (a verbatim transcript, or a marked TODO
+  and a QA FAIL). The recorded run answered 1 open fix pin in Lakeside and 0
+  in Atrium, and the assistant itself pointed out that `list_rooms` reports 2
+  open pins for Lakeside because that count includes an open question pin.
+- **Issue #38.** `on-call-responder` has no shell, so it analysed the
+  measured cold-start tables and wrote the recommendation, and it marked what
+  it had read only through a fetch tool's summary as unconfirmed. The Engineer
+  then found four inaccuracies in its text; the agent's sentences were not
+  edited and a dated corrections section states the right values.
+
+**What it did not change.** The hooks are guardrails against accidents, not a
+boundary: they match on the shell string, the Edit, Write and PowerShell tools
+are not hooked, and a person or an agent that can edit
+`.claude/settings.local.json` can switch them off (`docs/permissions.md`,
+"What the hooks cannot enforce"). The MCP server is read-only because of its
+code and tests, not because of its credential, which is an ordinary studio
+login (`security/agent-extension-security.md`; the open issue #36). QA and the
+orchestrator reviewing a result before merge is still a convention, not
+something the repository enforces. The CI jobs `agents-sync`, `mcp`, `hooks`
+and `security` show on a commit but are not in `deploy.needs`; whether any of
+them should gate the deploy is the owner's decision (#27). Whether the pack
+made the work faster or better was not measured: no timings were recorded.
+
+**The Render outage lesson.** On 14 Oct the CI `deploy` job failed three times
+at "Trigger Render deploy" with HTTP 500 while status.render.com listed an
+incident on builds and deploys (listed 19:32 to 22:18 UTC, deploys for free
+instances paused from 20:41 UTC). The later failures fall inside that window
+and are, in the incident file's words, "consistent with" the outage; the first
+failure began less than two minutes before the listing and is "consistent
+with, not established" (`ops/incidents/2026-10-14-render-platform-outage.md`).
+Our own gap was how it was handled: the first failure was called transient
+because the next push passed, with no look at the status page, and the job was
+re-run and `/health` polled before the provider had been ruled out. The lesson
+is to tell a provider outage from our own failure before retrying or editing
+code: the status page first, then `/health`, then the runbook decision tree
+(`ops/runbook.md`). Contrast the failure the same day in
+`ops/incidents/2026-10-14-render-deploy-exit-127.md`: that one was our own
+configuration (a `dockerCommand` override in `render.yaml`), it crashed the
+service at start, and waiting would not have fixed it; the fix was to remove
+the override. The two look alike from the CI page, which is why the decision
+tree starts with the provider check. Since issue #38 the `deploy` job prints a
+`HINT:` pointing at the status page and the runbook on a 5xx or an unreachable
+hook, but that code has only run against a local dry run, not during a real
+outage.
+
+**Numbers.** Each with how it was obtained.
+
+- **Issues.** `gh issue list --state all --limit 100 --json number,state`, run
+  2026-10-15 09:29 UTC with `origin/main` at `42504ea`: 39 issues (#1 to #39,
+  none missing; the limit of 100 is above 39), 27 closed and 12 open. The
+  open ones are #27 to #37, triaged in issue #39 (ten labelled `deferred`, #35
+  labelled `wontfix`, all kept open), and #39 itself, which was in progress
+  when this was counted.
+- **QA FAIL verdicts: 3.** Counting rule: a QA FAIL is a comment headed
+  `## QA: FAIL` on an issue. I read the comments of all 27 closed issues (the
+  open ones have only the triage comments from #39, no QA verdict) and
+  compared them with the appendix entries that say "QA pass 1: FAIL" or "first
+  pass: FAIL". Both sources give the same three:
+  - **#5:** acceptance item 2 failed. The frontend dev server's real default
+    origin (port 8080) was blocked by CORS; fixed by pinning the dev server to
+    5173 with `strictPort`, then QA PASS.
+  - **#14:** the new Summary described the issue #5 CORS block as the cause of
+    a silent fall-back to the mock client, which conflated two separate bugs;
+    corrected, then QA PASS.
+  - **#22:** criterion G failed: a blank line in `docs/agent-extension-pack.md`
+    ended the Markdown table, so the hook, permission and custom-agent rows
+    rendered as plain text; no test covers that file. Fixed, then QA PASS.
+
+  Found in one source only or not counted: **#38**, whose appendix entry says
+  QA flagged three overclaims in the outage postmortem that were sent back and
+  fixed, but both QA comments on the issue are headed PASS (appendix only, not
+  counted); **#15**, whose QA comment is a fresh-clone report with one failing
+  step (`make up` after the README's `npm install`) but no verdict on an
+  Engineer's work (both sources mention the failing step; not counted);
+  **#12**, reopened after its QA PASS because the first real Render deploy
+  crashed (a production failure, not a QA FAIL).
+- **Test counts**, from the summary line of each run on 2026-10-15
+  (09:16 to 09:20 UTC, Git Bash on Windows 11, started from commit `42504ea`;
+  the commits of issue #39 that followed change documentation only):
+
+  | Command | Result |
+  |---|---|
+  | `make test` | 150 passed, 1 warning |
+  | `make frontend-test` | 51 passed (7 test files) |
+  | `make mcp-test` | 51 passed, 6 skipped (the integration test file, skipped without `PINPOINT_BASE_URL`) |
+  | `make hooks-test` | 65 tests, OK |
+  | `make integration` | 14 passed, then 1 passed (the persistence test, run separately) |
+  | `make mcp-integration` | 6 passed |
+  | `make e2e` | 2 passed |
+
+- **Security scan.** Semgrep `1.180.0` on a `git archive` export of commit
+  `0a56668`: 19 findings, counted from the JSON (1 ERROR, 2 MEDIUM, 16
+  WARNING), 0 from `p/secrets`, 246 files scanned; the gate command exited 0.
+  That equals the 19 findings documented in `security/semgrep-report.md`.
+
 ## Appendix: per-issue log
 
 ## 2026-10-12 — Spec and bootstrap

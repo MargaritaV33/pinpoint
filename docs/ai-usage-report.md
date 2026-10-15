@@ -2042,3 +2042,22 @@ below it as they happen.
   fresh-clone agent also overwrote an older scratch export at
   `%TEMP%\pinpoint-semgrep` (from 14 Oct, left behind by the #26 work,
   contains no `.env`); it remains, and the owner may delete it.
+
+- **CI-side proof and close (orchestrator), issue #39:** CI run 38715163287 on
+  `527fc6b` and run 38719649629 on `5d11463` were green through `deploy`. After
+  the second, one read-only `GET /health` returned `200` with `commit`
+  `5d11463986c2...`, equal to that run's `headSha` and to the local `HEAD` at
+  the time; issue counts from `gh` then were 39 issues, 27 closed, 12 open,
+  which matches the Summary's figures excluding #39 (28 closed and 11 open
+  once #39 is closed, as it now is). This entry is committed with `[skip ci]`
+  so production keeps serving `5d11463` while `main` is one docs-only commit
+  ahead; `/health` is compared with the last commit pushed without `[skip ci]`.
+  Orchestrator closed the issue on QA PASS (twice) and the fresh-clone check.
+  **Left for the owner:** confirm or relabel #35 (`wontfix` records "keep
+  `localStorage`"); upgrade or recreate the free Postgres before about 13 Nov
+  2026; the unconfirmed runbook items (which connection string works from the
+  owner's machine, IP allow-list); decide whether the hook should be
+  hardened (the PowerShell tool and file-edit tools are outside its matcher);
+  delete the stale `%TEMP%\pinpoint-semgrep` folder and the empty untracked
+  `frontend;C` directory in the repo root, neither created by this issue; and
+  the interactive MCP server approval in `claude`, which no agent can do.

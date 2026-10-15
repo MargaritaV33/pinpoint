@@ -235,25 +235,103 @@ jobs:
           --exclude-rule dockerfile.security.missing-user.missing-user .
 
   deploy:
+    # Failure hints (issue #38): when the hook answers 5xx or not at all, or
+    # /health never answers within the budget, the step prints a `HINT:` that
+    # names https://status.render.com and ops/runbook.md (decision tree), then
+    # still fails. A 4xx from the hook is our configuration (bad or rotated
+    # secret) and gets no hint; a /health that answers with another commit gets
+    # a `NOTE:` ("up but serving a different commit"), not the outage hint.
+    # The hint is static text: this job does not query Render's status API and
+    # makes no gating decision (#27). Nothing below prints the hook URL: its
+    # response goes to a temp file and only the HTTP status code is kept.
+    #
+    # WAIT_ATTEMPTS and WAIT_INTERVAL exist only so ops/dry-run-deploy-hint.py
+    # can run the loop in seconds against local stubs. They are not set here,
+    # so CI keeps the defaults: 60 attempts, 10 seconds apart.
     needs: [stack]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Trigger Render deploy
-        run: curl --fail-with-body -sS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+        run: |
+          hint() {
+            echo "HINT: $1"
+            echo "HINT: This can be a Render outage rather than a problem in this repository. Check https://status.render.com for an open incident on builds or deploys, then follow ops/runbook.md, decision tree. Do not retry in a loop or change code until the provider is ruled out."
+          }
+          body_file="$(mktemp)"
+          curl_rc=0
+          status="$(curl --fail-with-body -sS -X POST -o "$body_file" -w '%{http_code}' "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")" || curl_rc=$?
+          if [ -s "$body_file" ]; then cat "$body_file"; echo; fi
+          rm -f "$body_file"
+          if [ "$curl_rc" -eq 0 ]; then
+            exit 0
+          fi
+          status="${status:-000}"
+          echo "Deploy hook failed: curl exit $curl_rc, HTTP status $status."
+          case "$status" in
+            5??)
+              hint "the deploy hook answered HTTP $status."
+              ;;
+            000)
+              # No HTTP response. Only network-class curl errors are treated as
+              # "unreachable"; a malformed or empty hook URL (curl 1, 2, 3) is
+              # our configuration and gets no provider hint.
+              case "$curl_rc" in
+                5|6|7|28|35|52|55|56) hint "the deploy hook could not be reached (curl exit $curl_rc)." ;;
+              esac
+              ;;
+          esac
+          exit "$curl_rc"
 
       - name: Wait for /health to report this commit
         run: |
+          hint() {
+            echo "HINT: $1"
+            echo "HINT: This can be a Render outage rather than a problem in this repository. Check https://status.render.com for an open incident on builds or deploys, then follow ops/runbook.md, decision tree. Do not retry in a loop or change code until the provider is ruled out."
+          }
           sha="${{ github.sha }}"
-          for i in $(seq 1 60); do
-            body="$(curl -fsS "${{ vars.PUBLIC_URL }}/health" || true)"
-            deployed="$(echo "$body" | jq -r '.commit // empty' 2>/dev/null || true)"
+          attempts="${WAIT_ATTEMPTS:-60}"
+          interval="${WAIT_INTERVAL:-10}"
+          body_file="$(mktemp)"
+          last_kind="none"
+          last_code="000"
+          deployed=""
+          for i in $(seq 1 "$attempts"); do
+            code="$(curl -sS -o "$body_file" -w '%{http_code}' "${{ vars.PUBLIC_URL }}/health")" || true
+            code="${code:-000}"
+            deployed=""
+            case "$code" in
+              2??) deployed="$(jq -r '.commit // empty' "$body_file" 2>/dev/null || true)" ;;
+            esac
             if [ "$deployed" = "$sha" ]; then
+              rm -f "$body_file"
               echo "Deployed commit $deployed matches $sha."
               exit 0
             fi
-            echo "Attempt $i/60: deployed commit is '${deployed:-<none>}', waiting for $sha..."
-            sleep 10
+            case "$code" in
+              000|5??) last_kind="down" ;;
+              4??) last_kind="client" ;;
+              *) last_kind="other" ;;
+            esac
+            last_code="$code"
+            echo "Attempt $i/$attempts: HTTP $code, deployed commit is '${deployed:-<none>}', waiting for $sha..."
+            sleep "$interval"
           done
-          echo "Timed out after 10 minutes waiting for $sha to appear at ${{ vars.PUBLIC_URL }}/health"
+          rm -f "$body_file"
+          echo "Timed out after $((attempts * interval)) seconds waiting for $sha to appear at ${{ vars.PUBLIC_URL }}/health"
+          case "$last_kind" in
+            down)
+              if [ "$last_code" = "000" ]; then
+                hint "/health never answered with the expected commit; the last attempt got no HTTP response."
+              else
+                hint "/health never answered with the expected commit; the last attempt got HTTP $last_code."
+              fi
+              ;;
+            client)
+              echo "NOTE: /health answered HTTP $last_code, a client error. That points at this application or its routing, not at a provider outage. See ops/runbook.md, decision tree."
+              ;;
+            *)
+              echo "NOTE: the service is up (HTTP $last_code) but serving a different commit ('${deployed:-<none>}'), not $sha. Either the new deploy has not gone live or a newer commit is already live. See ops/runbook.md, decision tree."
+              ;;
+          esac
           exit 1

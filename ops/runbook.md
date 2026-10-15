@@ -107,8 +107,16 @@ Related: [`docs/release-process.md`](../docs/release-process.md),
 - The free web service **sleeps after about 15 minutes with no requests**.
   The next request is slow while the service starts again; a slow first
   request is **not an incident by itself**.
-- Measured wake-up time: see
-  [the diagnosis](diagnosis-2026-10-15-cold-start.md) (pending measurement).
+- The 15-minute figure comes from Render's documentation
+  (https://render.com/docs/free), not from our own test; the page was read
+  through a summary, not verbatim. The diagnosis only tested gaps of 16
+  minutes. Of five attempts after such a gap, four were slow and one (`cold3`)
+  was answered fast, so a cold start after 16 idle minutes is likely but not
+  guaranteed, and nothing shorter than 16 minutes was tried.
+- Measured wake-up time: **about 33 seconds** (4 of 5 attempts, `GET /health`,
+  15 Oct 2026; 32.4 s to 32.8 s). Render's documented figure is about one
+  minute (same page, same caveat). Details and the numbers behind them:
+  [the diagnosis](diagnosis-2026-10-15-cold-start.md).
 - Consequence for CI: the `deploy` job waits up to 10 minutes (60 x 10 s) for
   `/health` to report the new commit, which includes a possible wake-up.
 
@@ -147,9 +155,11 @@ Work top to bottom and stop at the first step that applies. "Agent" proposes;
      live.
 4. **`/health` times out or returns 502/503.** Cold start or outage?
    - If the service may have been idle for 15 minutes or more, this can be the
-     wake-up. **Wait, then retry once** after the measured cold-start time (see
-     [the diagnosis](diagnosis-2026-10-15-cold-start.md), pending measurement).
-     Do not hammer the URL.
+     wake-up. **Wait, then retry once** after about a minute: the measured
+     cold start was about 33 s (4 of 5 attempts, 15 Oct 2026) and Render's
+     documented figure, per Render's docs, is about one minute (see
+     [the diagnosis](diagnosis-2026-10-15-cold-start.md)). Do not hammer the
+     URL.
    - Still failing after that one retry and step 1 showed no incident: the owner
      opens the **Logs** and **Events** tabs of the `pinpoint` service. A crash
      at boot (for example the exit-127 case in

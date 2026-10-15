@@ -27,9 +27,11 @@ Log in as the seeded demo studio:
 - Password: `pinpoint`
 
 The web service is on Render's free plan and spins down after a period of
-inactivity, so the first request after idling takes roughly 30–60 seconds to
-wake it back up (see `docs/deployment.md`'s "Free plan limits"). Subsequent
-requests are fast.
+inactivity, so the first request after idling has to wake it back up. We
+measured about 33 seconds (4 of 5 attempts, 15 Oct 2026; see
+[`ops/diagnosis-2026-10-15-cold-start.md`](ops/diagnosis-2026-10-15-cold-start.md));
+Render's documentation says about one minute. See also `docs/deployment.md`'s
+"Free plan limits". Subsequent requests are fast.
 
 ## Quick start
 

@@ -59,6 +59,13 @@ cd pinpoint
   that page. After installing via `pip`, make sure the directory `uv` lands
   in is actually on your `PATH` (e.g. `pip show -f uv` to find it) — a
   successful `pip install uv` does not guarantee `uv --version` works yet.
+  In Git Bash, `pip show -f uv` prints a `Location:` (a `...\site-packages`
+  folder) and `..\Scripts\uv.exe`; add the `Scripts` folder beside that
+  `site-packages` as a Git Bash path (it differs per machine):
+  `export PATH="/c/Users/<you>/AppData/Roaming/Python/Python3xx/Scripts:$PATH"`,
+  and put that line in `~/.bashrc` to keep it. `python -m uv` runs the same tool
+  without touching `PATH` (e.g. `python -m uv --version`), but the `make`
+  targets call plain `uv`, so they still need the `PATH` fix.
 - Node.js 20+ (CI itself runs Node 22; 20 is the floor)
 - Docker with Compose v2 (`docker compose`, not the standalone
   `docker-compose`) — Docker Desktop (or your daemon) needs to actually be

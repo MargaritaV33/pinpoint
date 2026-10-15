@@ -1753,3 +1753,22 @@ deploy of this batch and is logged in the entries below it.
   sampler's operator, and the report says so). Render's dashboard log for a
   cold start was never seen; the owner could paste it to close the roughly
   28 s that the local start does not explain.
+
+- **CI-side proof (orchestrator), issue #38:** two pushes. `c32f839` (parts
+  1, 2, 3 and 5) ran as CI run 38697503500, and `41234a4` (part 4 and the log)
+  as run 38709442165; every job was green in both, `deploy` included. After
+  the second run one read-only `GET /health` returned `200` with `commit`
+  `41234a481b5f...`, the pushed SHA; the first push was confirmed the same way
+  (`c32f839`). This is also the first time the new `deploy` hint code ran on a
+  real runner: the hook step succeeded, so the hint path (5xx or unreachable)
+  was exercised only by the local dry run, not by a real outage, and the
+  workflow log shows the hook URL masked as `***`. The measured wake-up
+  (about 33 s) fits the 600 s wait budget. This entry is committed with
+  `[skip ci]`, so production keeps serving `41234a4` while `main` is one
+  docs-only commit ahead. Orchestrator closed the issue on QA PASS (twice).
+  Owner follow-ups, not done here: link the diagnosis from
+  `docs/deployment.md` (lines 85 to 87), optional `--max-time` on the wait
+  step's `curl`, paste a Render dashboard log of one cold start to explain
+  the roughly 28 s the local start does not account for, and confirm the
+  Postgres connection-string and expiry-date items the runbook marks "owner
+  to confirm" (free Postgres expires about 13 Nov 2026 per the runbook).

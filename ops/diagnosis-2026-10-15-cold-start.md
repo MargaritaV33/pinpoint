@@ -2,9 +2,9 @@
 
 Measured wake-up time of the `pinpoint` web service on Render's free plan,
 taken for issue #38 (part 4). The measurements and the local capture are in
-this file. The analysis and the recommendation are written afterwards by the
-`on-call-responder` agent from the numbers below; until then those two
-sections are placeholders. Where to look when production misbehaves:
+this file. The analysis and the recommendation at the end were written
+afterwards by the `on-call-responder` agent from the numbers above and are
+included unedited. Where to look when production misbehaves:
 [`runbook.md`](runbook.md).
 
 ## Scope and method
@@ -277,17 +277,76 @@ for /health to report this commit", lines 293 and 294):
 
 ## Analysis
 
-To be written by the on-call-responder agent from the numbers above.
+*Sources: ops/diagnosis-2026-10-15-cold-start.md (all), docs/deployment.md, docs/release-process.md, ops/runbook.md, render.yaml, README.md (lines 29-32), _docs/decisions.md (Deployment row, line 18); URLs read: https://render.com/docs/free (fetched; summarised by a fetch tool, not read verbatim). Fetched but containing no prices or instance specs: https://render.com/pricing, https://render.com/pricing#compute, https://render.com/docs/web-services. HTTP 404: https://render.com/docs/instance-types, https://render.com/docs/pricing. I did not open the Dockerfile or ci.yml myself; I rely on the report's quotes of them. This is advice from the on-call-responder agent, not authority.*
+
+Written by the on-call-responder agent from the numbers above; not edited by the engineer. Advice only: no change to render.yaml or the Deployment decision.
+
+**Cold-start cost.** In the 4 counted cold samples (cold1, cold2, cold4, cold5) `time_total` was 32.374 s min, 32.390 s median, 32.764 s max. The 5 warm samples were 0.275 s min, 0.278 s median, 0.281 s max. On the same request (`GET /health`), 32.39 / 0.278 is about 116, so roughly 115x. The report states no percentiles, and neither do I. Nearly all of the time is in `time_starttransfer` (32.373 to 32.764 s). DNS, connect and TLS are small: `time_appconnect` is at most 0.482 s (cold5) and 0.074 to 0.090 s in the other three. Cold1, cold2 and cold4 are within 0.022 s of each other (32.373 to 32.395 s). Cold5 is 0.37 s higher, with a slower lookup and connect (0.254 s and 0.261 s). That regularity is observed. I do not assert a cause for it.
+
+**Cold3.** It had the same 16-minute gap, but `time_total` was 0.284 s, just above the warm maximum of 0.281 s and inside the warm range. It shows that spin-down was not guaranteed after a 16-minute gap on this service: 4 of 5 attempts were cold, and 1 was not. It does not show why. The report names three possibilities: traffic we did not generate, a platform probe, or a spin-down that did not happen. None is established, and I add no others. One attempt cannot give a rate of spin-down.
+
+**Consistency with the documents.**
+- docs/deployment.md only says the first request after idling "pays a cold-start delay". The numbers fit that, but the doc gives no figure.
+- README's "roughly 30-60 seconds": 32.4 to 32.8 s is inside that range, at its low end.
+- Render's free-plan page says a service spins down after "15 minutes without receiving any inbound traffic" and that spin-up "takes about one minute" (https://render.com/docs/free). The measurements are consistent with both statements.
+- The runbook's "about 15 minutes" idle claim is not tested at its edge. All gaps were 16 minutes (one was 16 min 05.4 s). We tried no shorter gap, so we know nothing about 5, 10 or 14 minutes.
+
+**Is anything broken?** No defect was found. The 32 s is not explained by the application's own start. The local first start took about 4.2 s to the first uvicorn line and 4.4 s to the first 200, and the seeded restarts took 1.0 to 2.5 s. This is a developer machine, not Render, so the comparison is loose. Even so, roughly 28 s of the 32.4 s is not accounted for by the app's startup. What makes up that remainder on Render was not observed, because the Render dashboard log was not seen. I do not guess the split. The report lists what is unobserved: image pull and spin-up before our container starts, platform probes, Render's log lines, and whether the instance is new or resumed.
+
+**Effect on CI and people.**
+- The CI wait loop is 60 x 10 s of sleep. One wake-up of 32.4 to 32.8 s is about 5.5 % of that budget, or about 3 poll intervals, so it fits. The `curl` has no `--max-time`, so a poll waits as long as the response takes. Here it waited about 33 s and got a 200.
+- A client with a timeout under about 33 s would have seen a failure on the same request. That is arithmetic, not observed.
+- A person opening the site would wait about half a minute for the first response. Render says browsers see "a loading page" in the meantime (https://render.com/docs/free). I did not observe what our site shows.
+- The runbook's "wait, then retry once" is sound. The measured wait is about 33 s, and Render's own figure is about a minute. A retry after roughly a minute covers both.
+
+**Limits.** 4 cold samples, with one more attempt that was not cold. One URL (`/health`, a light route). One time window (07:19 to 08:42 UTC), one region, one day, and one build (`c32f839`). No gap under 16 minutes was tried. The "nothing else touched the service" statement is the sampler operator's own and cannot be checked.
 
 ## Recommendation
 
-The recommendation must pick exactly one of: (1) keep the free plan and
-document the wake-up in the runbook, (2) add an external uptime ping, (3) move
-to a paid instance. It is advice only: this issue does not add a ping, does not
-change the plan and does not touch `render.yaml` or the Deployment row of
-`_docs/decisions.md`; that is the owner's decision.
+The brief for the recommendation was to pick exactly one of: (1) keep the
+free plan and document the wake-up in the runbook, (2) add an external uptime
+ping, (3) move to a paid instance. It is advice only: this issue does not add a
+ping, does not change the plan and does not touch `render.yaml` or the
+Deployment row of `_docs/decisions.md`; that is the owner's decision.
 
-To be written by the on-call-responder agent from the numbers above.
+**Choose option (1): keep the free plan and document the wake-up.** This is advice only. It changes nothing in `render.yaml` and does not reopen the Deployment row of `_docs/decisions.md`.
+
+**Reasons from the data.**
+- All four cold requests completed with HTTP 200 in at most 32.8 s, inside the documented range.
+- Nothing was found broken.
+- The CI loop absorbs a wake-up with about 567 s to spare.
+- The cost is one slow first request after idle, which the project accepted when it chose the free plan (docs/deployment.md, "Free plan limits").
+
+**Options not chosen.**
+- (2) External ping:
+  - Render counts inbound traffic as what keeps a free service awake (https://render.com/docs/free). A ping more often than every 15 minutes would therefore defeat the idle spin-down.
+  - The same page grants 750 free instance hours per workspace per calendar month, and an always-awake service uses about 744 h in a 31-day month (my arithmetic). That is tight if the workspace has any other free service.
+  - The page says nothing for or against pings, and I found no acceptable-use text. Whether a ping conflicts with Render's terms is unconfirmed, because I did not read the terms.
+  - The same page says free instances should not be used for production and that Render "might restart a Free web service at any time". A ping would not prevent a restart.
+  - A ping also adds an external dependency and extra access-log lines.
+- (3) Paid instance: I could not read any instance price or spec from Render's public pages, so I state no price. Whether a paid instance never spins down is also unconfirmed here. A paid web service needs billing on the account. It would not fix the database: free Postgres "expire[s] 30 days after creation" and is deleted after a 14-day grace period (https://render.com/docs/free). The runbook estimates expiry around 13 Nov 2026, which is a more pressing dated item than the 32 s.
+
+**What would change this advice.**
+- Moving toward (3):
+  - Real clients or reviewers start using the live URL and hit client timeouts or abandon it.
+  - A wake-up longer than about 60 s.
+  - The `deploy` job failing because of a wake-up.
+- Moving toward (2): an owner-confirmed read of Render's terms that allows pings, plus a decision that a half-minute first load matters.
+- Fixing the app rather than the plan: Render logs showing that part of the remainder is our own startup or image.
+
+**Follow-ups for the owner.**
+- README lines 29 to 32: replace "roughly 30-60 seconds" with the measured "about 33 seconds (4 of 5 attempts, 15 Oct 2026)". Keep Render's "about one minute" as the documented figure.
+- ops/runbook.md:
+  - Line 107: say the 15-minute figure comes from Render's docs, and that we tested only 16-minute gaps.
+  - Lines 110-111 and 150-151: replace "pending measurement" with about 33 s, and keep "wait, then retry once" with a wait of about a minute.
+  - Add one line that a cold request can be answered (cold3) or not.
+- docs/deployment.md lines 85 to 87: link the diagnosis and add the measured figure.
+- Separately, the owner may want `--max-time` on the CI `curl` (line 300), which is their decision.
+- Measure next:
+  1. The owner pastes the dashboard Logs tab covering one cold start, with the time of the request. This closes the unobserved 28 s.
+  2. Gaps of 5, 10, 14 and 15 minutes, to test the 15-minute claim.
+  3. A repeat at other times and on other days, and a second look at cold3-type misses.
+  4. The duration of a full deploy, which this report did not measure.
 
 ## Read-only statement
 

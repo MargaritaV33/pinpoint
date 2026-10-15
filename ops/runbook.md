@@ -88,19 +88,58 @@ Related: [`docs/release-process.md`](../docs/release-process.md),
   `fromDatabase`); nobody types it in.
 - The owner reaches the database from the Render dashboard (the `pinpoint-db`
   page). The dashboard shows an internal and an external connection string.
-  Which of the two works from the owner's machine on the free plan, and
-  whether an IP allow-list is needed: **owner to confirm** (not stated in the
-  repo). Never paste either string, or the password, into a file, an issue
-  or a chat.
+  The app's `DATABASE_URL` is Render's **internal** connection string
+  (confirmed by the owner 2026-10-15; `render.yaml` sets `DATABASE_URL` with
+  `fromDatabase`, `name: pinpoint-db`, `property: connectionString`). Which
+  string works from the owner's own machine, and whether an IP allow-list is
+  needed: **unconfirmed** (the owner did not answer this part). Never paste
+  either string, or the password, into a file, an issue or a chat.
 - The free Postgres **expires 30 days after creation** unless upgraded
   (`docs/deployment.md`, "Free plan limits"). It was created when the
-  Blueprint was applied on 14 Oct 2026 (issue #12; exact time not recorded),
-  so expiry is around 13 Nov 2026: **owner to confirm the date in the
-  dashboard**. An expired database looks like "`/health` fine, every other
-  route 5xx" (tree, step 5).
+  Blueprint was applied on 14 Oct 2026 (issue #12; exact time not recorded).
+  Expiry is **about 13 Nov 2026, confirmed by the owner 2026-10-15** (written
+  "about": the owner gave no exact date). An expired database looks like
+  "`/health` fine, every other route 5xx" (tree, step 5). What to do before
+  then: [Reminder: free database expires about 13 Nov 2026](#reminder-free-database-expires-about-13-nov-2026).
 - The schema is created by the app on start (`Base.metadata.create_all`,
   `docs/deployment.md`, "No migration step"), so there is no migration to
   run by hand.
+
+## Reminder: free database expires about 13 Nov 2026
+
+Dated reminder, written 2026-10-15 (the free-plan limit is in
+`docs/deployment.md`, "Free plan limits"; the date is the owner's, see
+"Database access").
+
+- **Before about 13 Nov 2026 the free Postgres (`pinpoint-db`) must be
+  upgraded or recreated. Otherwise the live demo goes down:** the web service
+  stays up and `/health` stays green, but every route that touches the
+  database fails (decision tree, step 5).
+- **Who acts: the owner, on the Render dashboard** (upgrade the plan, or
+  recreate the database). Agents may only remind: they have no dashboard
+  access (`docs/permissions.md`, "Needs the repo owner"). Nothing in this
+  repository does either step, and `render.yaml` is not changed by this
+  reminder.
+- **What "recreated" implies.** A new database is empty. `docs/deployment.md`,
+  "No migration step", and `backend/app/store/sqlalchemy/db_store.py`
+  (`SQLAlchemyStore.__init__`) say the app creates the tables on every boot
+  and runs the seed only when the database holds no studio user. So on the
+  next boot of the web service the tables are created and the seed runs: the
+  seeded demo data and the seeded demo login (the credentials in the root
+  `README.md`, "Live demo") come back, and everything created on the live
+  site since the seed (studio accounts, rooms, pins, comments, uploaded
+  images, which are stored in the database) is lost.
+- **Not confirmed, so not claimed:** whether Render keeps an expired free
+  database for any grace period (the diagnosis,
+  [`diagnosis-2026-10-15-cold-start.md`](diagnosis-2026-10-15-cold-start.md),
+  quotes a figure from Render's free-plan page, but that page was read only
+  through a summary, not verbatim); whether a recreated database is wired to
+  the web service automatically or needs a manual step in the dashboard;
+  whether an upgrade keeps the data and the connection string. The owner checks
+  these on the dashboard.
+- **How to tell afterwards that it worked.** `/health` does not touch the
+  database, so it proves nothing here. The owner logs in to the live demo as
+  the seeded studio and opens a seeded room.
 
 ## Free-plan behaviour
 

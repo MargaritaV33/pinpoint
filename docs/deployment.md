@@ -84,7 +84,9 @@ part of that choice, not open problems:
 
 - The free web service spins down after a period of inactivity, so the
   first request after idling pays a cold-start delay while it spins back
-  up.
+  up. Render's documentation says about one minute; we measured about 33
+  seconds (4 of 5 attempts, 15 Oct 2026; see
+  [`ops/diagnosis-2026-10-15-cold-start.md`](../ops/diagnosis-2026-10-15-cold-start.md)).
 - Render's free Postgres databases expire 30 days after creation unless
   upgraded to a paid plan.
 

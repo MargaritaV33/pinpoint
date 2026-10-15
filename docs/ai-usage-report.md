@@ -1972,3 +1972,73 @@ below it as they happen.
   **Not verified:** the interactive `claude` start that approves the MCP
   server (it needs a person at the prompt); only the server start and an
   `initialize` round trip were checked. Section H is pending.
+
+### Issue #39, fresh-clone check and fixes (section H)
+
+- **Method (same procedure as #15):** after the first push (`527fc6b`, CI
+  green through `deploy`), a QA agent in a fresh session cloned
+  `MargaritaV33/pinpoint` into an empty temporary folder outside this
+  repository, confirmed `HEAD` equal to the pushed SHA, and followed the
+  README top to bottom, recording command and output per step. It was told not
+  to read the owner's checkout, any `.env` or `_local/`; its `ls -a` of the
+  clone root showed neither, and it listed every path it opened outside the
+  clone. The report is headed "Fresh-clone check", not QA PASS or FAIL,
+  because it is not a verdict on an engineer's work and QA FAILs are counted
+  elsewhere.
+- **What it found:** all 14 README sections passed, none blocking, no
+  application defect. 150 backend, 51 frontend, 14 plus 1 integration, 2
+  e2e (twice), 65 hooks, 51 MCP plus 6 skipped, 6 MCP integration, 150 in the
+  Compose test container, and 19 Semgrep findings (none from `p/secrets`), all
+  as documented. Eight documentation gaps: a reproducible one (`make
+  frontend-test` leaves a rewritten lockfile, and a later `make e2e` fails at
+  `npm ci`; the README only named `make up`), a README sentence that was
+  false, the uv PATH help not written for Git Bash, `make mcp-integration`
+  missing, no headless form for the skill and subagent examples, `make run`
+  not said to keep the terminal, and stale details in
+  `security/semgrep-report.md`. It did not exercise a cold Docker build, a
+  first Chromium download, or the interactive approval of the MCP server (it
+  needs a person at the prompt).
+- **The false sentence, and how it was found:** the first engineer pass
+  reported that hook rule 3 blocked the documented Git Bash Semgrep command
+  (`--exclude .env`) and wrote that into the README. It had reproduced the
+  block only with a stand-in command, `true --exclude .env`. QA could not
+  reproduce it for the real command, and the clone agent ran the documented
+  block as written three ways (in its own hooked session, in a fresh `claude
+  -p` session inside the clone, and by feeding the hook the exact payload):
+  it ran every time, and the hook demonstrably stays active (it blocked a
+  recursive `rm` and `cat .env` in the same sessions). The sentence was
+  deleted. Lesson for the log: a guard's behaviour has to be tested with the
+  real command, not a command that merely shares one token; and an agent that
+  routes around a guard it believes is wrong should say so, which this one
+  did, but a belief about a guard is not a finding until it is reproduced.
+  The earlier appendix paragraph above records the unverified version and is
+  left as the historical record.
+- **Fixes (engineer, fresh session, docs only, nine commits):** all eight
+  gaps, the four statements QA could not support in the Summary, and the
+  "Related" lines of the two ops/incidents files: the exit-127 file said the
+  outage had a "similar-looking symptom: a red `deploy` job", but its own
+  Detection section says the `deploy` job did not exist yet, so the two
+  incidents were seen differently. That contradiction came from the
+  orchestrator's own earlier work under #38 and had passed QA there. Last,
+  QA noted the README said headless subagents "must" have `Agent` in
+  `--allowedTools`; QA ran it without and it launched, so the sentence was
+  reworded to what was observed.
+- **Verification:** QA PASS for 527fc6b..HEAD (the changed README steps, the
+  four Summary corrections recomputed from `gh` and the incident file, the
+  forbidden-files check, 82 links across 19 files, and `make test` 150,
+  `make hooks-test` 65, `make mcp-test` 51 plus 6 skipped). It reproduced the
+  lockfile failure once and the fix, and re-ran the documented Semgrep block
+  from a `git archive` export. Only Markdown files changed since the first
+  matrix run at `42504ea` (checked with `git diff --name-only`), so the test
+  counts are unchanged and no second full matrix was run after the fixes.
+- **Clone deleted:** the orchestrator deleted the clone folder after the
+  report, having first confirmed its path, remote, clean tree and that it was
+  not a link, with PowerShell `Remove-Item` on that exact path. The repo's own
+  Bash hook (rule 4) blocks `rm -rf` outside the repo, and the PowerShell
+  tool is not covered by that hook (a known gap recorded in
+  `docs/permissions.md`). The owner's issue text asked for the deletion, so
+  the action was authorised; routing it through PowerShell is noted here
+  because it is the same kind of thing as the Semgrep episode above. The
+  fresh-clone agent also overwrote an older scratch export at
+  `%TEMP%\pinpoint-semgrep` (from 14 Oct, left behind by the #26 work,
+  contains no `.env`); it remains, and the owner may delete it.

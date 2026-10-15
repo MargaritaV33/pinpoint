@@ -15,7 +15,10 @@ export of the tracked files is ever mounted (see "How to reproduce").
 
 ## Result in one paragraph
 
-232 files scanned with 298 rules (602 loaded) from the four rulesets
+232 files scanned at the audited commit (246 when the same scan is run on
+`527fc6b`, the pushed head of issue #39: 254 tracked files minus the 8 binaries
+that `.semgrepignore` skips, still 19 findings) with 298 rules (602 loaded)
+from the four rulesets
 `p/python`, `p/typescript`, `p/secrets`, `p/owasp-top-ten`: **19 findings: 1
 ERROR, 2 MEDIUM, 16 WARNING; 0 from `p/secrets`; 0 in application code**
 (backend, frontend, mcp-server, e2e and integration tests are all scanned).
@@ -59,8 +62,13 @@ starting with `.env`.
 
 ### Git Bash
 
+Run it from the repository root: `git archive HEAD` run inside a subdirectory
+exports only that subdirectory, and the scan would then cover a fraction of the
+tree.
+
 ```bash
-S=/path/outside/the/repo/scratch            # any scratch directory
+S=/c/Users/<you>/AppData/Local/Temp/pinpoint-semgrep   # example (Windows, Git Bash style path);
+                                                       # any scratch directory outside the repo
 mkdir -p "$S/src" "$S/out"
 git archive --format=tar -o "$S/tracked.tar" HEAD   # file first, no pipe
 (cd "$S/src" && tar -xf ../tracked.tar)
@@ -78,8 +86,9 @@ one of the two, otherwise Git Bash rewrites the container path.)
 
 ### PowerShell (Windows PowerShell 5.1)
 
-The repository path contains a space (`Pinpoint_AI Dev Tools`), hence the
-double-quoted `-v` arguments. `git archive` writes to a file (`-o`) first:
+Paths that contain a space (a user name or a folder name) need the
+double-quoted `-v` arguments used below. Run it from the repository root, as
+above. `git archive` writes to a file (`-o`) first:
 piping it into `tar` in PowerShell 5.1 corrupts binary data.
 
 ```powershell
@@ -96,7 +105,9 @@ docker run --rm -v "${s}\src:/src:ro" -v "${s}\out:/out" -w /src `
 ```
 
 Both forms were run on 2026-10-14 against the same commit and gave the same
-result (19 findings, 232 files). The committed `semgrep.json` comes from the
+result (19 findings, 232 files). A later run of the Git Bash and the PowerShell
+form on `527fc6b` (2026-10-15, from a fresh clone) gave 19 findings on 246
+files. The committed `semgrep.json` comes from the
 Git Bash run. The brief's original one-liner (`-v "${PWD}:/src"` with the output
 written into the mounted repository) is not used: it is read-write on the
 repository and PowerShell-only.

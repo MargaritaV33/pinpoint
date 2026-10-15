@@ -34,9 +34,11 @@ included unedited. Where to look when production misbehaves:
   only if the idle gap is at least 15 minutes **and** `time_total` is greater
   than 1.0 s. The warm totals are all below 0.281 s.
 - **Count: 4 of 5 cold samples.** `cold3` met the gap but its `time_total` was
-  0.284 s, inside the warm range, so it is listed as "gap met, not observed
-  cold" and excluded from the cold count and from the cold statistics. It is
-  not hidden and not replaced. Conclusions about cold-start time rest on these
+  0.284 s (0.003 s above the warm maximum of 0.281 s, and far below every
+  counted cold sample at 32.4 s and up), so it is listed as "gap met, not
+  observed cold" and excluded from the cold count and from the cold
+  statistics. The exclusion rests on the 1.0 s threshold fixed in advance. It
+  is not hidden and not replaced. Conclusions about cold-start time rest on these
   4 samples.
 - **Statistics:** minimum, median and maximum per group with the sample count,
   and the numbers behind them. No percentiles: 4 and 5 samples do not support
@@ -347,6 +349,32 @@ Deployment row of `_docs/decisions.md`; that is the owner's decision.
   2. Gaps of 5, 10, 14 and 15 minutes, to test the 15-minute claim.
   3. A repeat at other times and on other days, and a second look at cold3-type misses.
   4. The duration of a full deploy, which this report did not measure.
+
+## Corrections after review
+
+The Analysis and Recommendation above are the `on-call-responder` agent's text
+as written, unedited. On review the engineer and the orchestrator found the
+points below. The numbers in the tables above settle them. None of the
+conclusions and not the recommendation changes.
+
+- **(a) `time_appconnect`.** In cold1, cold2 and cold4 it is 0.074, 0.090 and
+  0.054 s (range 0.054 to 0.090 s), not "0.074 to 0.090 s in the other three".
+- **(b) cold3.** Its `time_total` of 0.284 s is above the warm maximum of
+  0.281 s by 0.003 s, and far below every counted cold sample (32.4 s and up).
+  "Inside the warm range" is not accurate. The exclusion of cold3 from the cold
+  count rests on the 1.0 s threshold fixed before any cold result.
+- **(c) Ratio.** 32.39 / 0.278 is about 116.5, so "roughly 115x" reads as
+  "about 116x".
+- **(d) cold5 offset.** Cold5 is 0.37 s above cold2, 0.38 s above cold1 and
+  0.39 s above cold4 (time to first byte). "0.37 s higher" holds against cold2
+  only.
+
+The Render free-plan facts in the Analysis and Recommendation (750 free
+instance hours per month, free database expiry after 30 days, a free service
+that Render might restart at any time, spin-down after 15 minutes without
+inbound traffic, spin-up of about one minute) were read by the agent through a
+fetch tool's summary of https://render.com/docs/free, not verbatim. They are
+unconfirmed until the owner reads that page.
 
 ## Read-only statement
 

@@ -269,9 +269,9 @@ the frontend prototyped in Lovable. Start here:
 Skills, subagents, an MCP server and hooks for Claude Code; the full table is
 [`docs/agent-extension-pack.md`](docs/agent-extension-pack.md). Start `claude` in the repo root, then:
 - Skill: `/implement-issue how does an issue move from open to PASS? Explain only, change nothing.`
-  (`implement-issue` walks one issue through PM, Engineer and QA).
+  (`implement-issue` walks one issue through PM, Engineer and QA). Headless: `claude -p "/implement-issue ..." --allowedTools "Read,Grep,Glob"`.
 - Subagent: `use the on-call-responder subagent to say what /health should return`
-  (read-only: its tools are Read, Grep, Glob and WebFetch).
+  (read-only: its tools are Read, Grep, Glob and WebFetch). Headless, `--allowedTools` must also include `Agent`.
 - MCP server (read-only questions about a running Pinpoint), two commands:
 
 ```sh
@@ -280,7 +280,7 @@ PINPOINT_EMAIL=demo@pinpoint.studio PINPOINT_PASSWORD=pinpoint claude   # in the
 ```
 
 Claude Code asks once to approve the project's `pinpoint` server, which `.mcp.json`
-runs as `uv run --directory mcp-server pinpoint-mcp`. Then ask "how many open fix
+runs as `uv run --directory mcp-server pinpoint-mcp`: plain `uv`, so the `PATH` fix above must be active in the shell that launches `claude`. Then ask "how many open fix
 pins are in each demo room?" (details: [`mcp-server/README.md`](mcp-server/README.md)).
 Tests: `make hooks-test` (the hooks in `agent-hooks/`), `make mcp-test` (the MCP server, HTTP mocked), `make mcp-integration` (needs `make up`; the MCP integration tests against the live stack).
 

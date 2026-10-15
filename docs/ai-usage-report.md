@@ -1897,3 +1897,64 @@ deploy of this batch and is logged in the entries below it.
   the roughly 28 s the local start does not account for, and confirm the
   Postgres connection-string and expiry-date items the runbook marks "owner
   to confirm" (free Postgres expires about 13 Nov 2026 per the runbook).
+
+## 2026-10-15 — Issue #39: Attempt 2 docs pass, backlog triage and fresh-clone check
+
+Opened by the orchestrator from the owner's eight-item brief plus two
+runbook items. This entry covers the first pass (docs, triage, first test
+matrix); the fresh-clone check, its fixes and the final deploy are logged
+below it as they happen.
+
+- **PM input/output:** input was the brief and the facts the orchestrator had
+  (open backlog #27-#37, existing labels, the isolated `uv`). Output was a
+  groomed issue in sections A to H, and it corrected the brief in four places
+  that would otherwise have been silently wrong: the line reference "24 -> 22"
+  is not in `mcp-server/README.md` but is cited twice in
+  `security/agent-extension-security.md`, and only one of the two citations is
+  wrong (line 72 correctly says 24, line 101 should say 22); `docs/architecture.md`
+  has no repository map to update, so a new one was required; the rubric
+  criteria 12 and 13 were described from what the repo's own files say they
+  cover, not invented; and the owner's runbook answer covers only the app's
+  connection string, so the part about the owner's machine and an IP allow-list
+  stays marked "unconfirmed". It ordered the work so the fresh-clone check
+  runs against the pushed `main`, and it classified the eleven backlog issues.
+  The classification was accepted as proposed: ten "deferred" and #35 (keep
+  the studio token in `localStorage` or move to cookies) as "won't do - out of
+  scope". #35 is the one judgement call: its first criterion is the owner's
+  decision, and `wontfix` effectively records "keep". The comment says the owner
+  can relabel it. It is to be confirmed by the owner, not settled by this log.
+- **Engineer input/output:** six commits (`c3a59e8`..`4d1c9ec`): the corrected
+  citation, the runbook facts and the dated 13 Nov 2026 database reminder,
+  four rows in `_docs/decisions.md`, the README sections and full repository
+  map, the architecture map and technology rows, and the attempt-2 part of the
+  report Summary (125 added lines, none removed, all above the Appendix).
+  Triage was done on GitHub (the `deferred` label, eleven comments). The
+  engineer chose the README skill and subagent examples by risk, not
+  convenience: `implement-issue` asked an explain-only question, and
+  `on-call-responder`, whose tools are Read, Grep, Glob and WebFetch. It ran
+  both headless and confirmed the working tree stayed clean. It reported that
+  the documented Git Bash Semgrep command was blocked by hook rule 3
+  (`--exclude .env` read as naming `.env`), ran the PowerShell form that
+  `security/semgrep-report.md` documents instead, and said so. That is a
+  guard being routed around, even if the documented alternative is legitimate
+  and the scan never reads `.env`; QA could not reproduce the block (below).
+- **Review:** the orchestrator checked the commit list, authorship, no
+  trailers, that the report diff sits at line 112 against the Appendix at
+  237, and read back all eleven issues on GitHub. QA's four non-blocking
+  observations are to be fixed in the next pass, not ignored: the README
+  sentence about the hook block; a Summary line saying the exit-127 and
+  outage incidents "look alike from the CI page", which the exit-127 incident
+  file does not support (the `deploy` job did not exist then); "failed three
+  times" counting pushes while the incident file also has two job re-runs;
+  and a #19 detail sourced from the demo transcript, not the appendix.
+- **Verification:** QA PASS for criteria A-G. QA re-ran the matrix on its own:
+  `make test` 150 passed, `make frontend-test` 51 passed (lockfile restored),
+  `make mcp-test` 51 passed and 6 skipped, `make hooks-test` 65 tests OK,
+  `make integration` 14 plus 1 passed, `make mcp-integration` 6 passed,
+  `make e2e` 2 passed, Semgrep 19 findings (0 from `p/secrets`) and the gate
+  0 findings. It recomputed the Summary's numbers (39 issues, 27 closed, 12
+  open at the time; QA FAILs #5, #14, #22, counted by reading the comment
+  heads of all closed issues, with #12, #15 and #38 deliberately not counted).
+  **Not verified:** the interactive `claude` start that approves the MCP
+  server (it needs a person at the prompt); only the server start and an
+  `initialize` round trip were checked. Section H is pending.

@@ -273,7 +273,7 @@ Skills, subagents, an MCP server and hooks for Claude Code; the full table is
 - Skill: `/implement-issue how does an issue move from open to PASS? Explain only, change nothing.`
   (`implement-issue` walks one issue through PM, Engineer and QA). Headless: `claude -p "/implement-issue ..." --allowedTools "Read,Grep,Glob"`.
 - Subagent: `use the on-call-responder subagent to say what /health should return`
-  (read-only: its tools are Read, Grep, Glob and WebFetch). Headless, `--allowedTools` must also include `Agent`.
+  (read-only: its tools are Read, Grep, Glob and WebFetch). Headless, we ran it with `Agent` added to `--allowedTools`: harmless, and some Claude Code versions or settings may need it to launch a subagent.
 - MCP server (read-only questions about a running Pinpoint), two commands:
 
 ```sh

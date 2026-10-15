@@ -98,7 +98,7 @@ and tests**, not by the credential:
 - The tools are annotated read-only and the server instructions say so
   (`test_readonly.py:31,39`).
 - No secret and no `guestToken` appears in a tool result
-  (`mcp-server/tests/test_secrets.py:33-71`; `mcp-server/README.md:24` says
+  (`mcp-server/tests/test_secrets.py:33-71`; `mcp-server/README.md:22` says
   `list_rooms` never returns `guestToken`).
 
 **What is not enforced.**

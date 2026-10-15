@@ -79,3 +79,21 @@ before the service serves its first request. `/health`'s `commit` field
 is `null` outside a real Render deploy (local dev, Compose, CI's own
 `stack` job) since there is no deployed commit to report there — see
 `backend/app/config.py` and `backend/app/routers/health.py`.
+
+## Failure hints in the `deploy` job
+
+A red `deploy` job is not always our fault: on 14 Oct Render's own incident
+blocked deploys and the hook answered HTTP 500 (see
+`ops/incidents/2026-10-14-render-platform-outage.md`). So the job now says
+where to look. When the deploy hook answers 5xx or cannot be reached, or when
+`/health` never reports the commit within the 10-minute budget because it did
+not answer or kept returning 5xx, the step prints a `HINT:` line naming
+https://status.render.com and the decision tree in `ops/runbook.md`, and then
+fails exactly as before. There is no hint for a 4xx from the hook (a bad or
+rotated `RENDER_DEPLOY_HOOK_URL` is our configuration) or for a 4xx from
+`/health`. When `/health` answers but with a different commit, the job prints a
+`NOTE:` ("the service is up but serving a different commit") instead of the
+outage hint. The hint is static text: the job does not query Render's status
+API. Behaviour is unchanged otherwise: still 60 attempts, 10 seconds apart,
+success only on a match. `ops/dry-run-deploy-hint.py` runs both steps against
+local stubs to show each case.

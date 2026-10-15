@@ -142,7 +142,11 @@ Concrete cases from the appendix:
   it could not be met by invention (a verbatim transcript, or a marked TODO
   and a QA FAIL). The recorded run answered 1 open fix pin in Lakeside and 0
   in Atrium, and the assistant itself pointed out that `list_rooms` reports 2
-  open pins for Lakeside because that count includes an open question pin.
+  open pins for Lakeside because that count includes an open question pin. The
+  answer counts (1 and 0) are also in the #19 appendix entry; the remark about
+  the 2 comes from the demo transcript in `mcp-server/README.md` ("Live demo
+  transcript", run 2026-10-14 at `8f64914`; the same run is pasted in
+  `docs/agent-extension-pack.md`), not from the appendix.
 - **Issue #38.** `on-call-responder` has no shell, so it analysed the
   measured cold-start tables and wrote the recommendation, and it marked what
   it had read only through a fetch tool's summary as unconfirmed. The Engineer
@@ -162,9 +166,11 @@ and `security` show on a commit but are not in `deploy.needs`; whether any of
 them should gate the deploy is the owner's decision (#27). Whether the pack
 made the work faster or better was not measured: no timings were recorded.
 
-**The Render outage lesson.** On 14 Oct the CI `deploy` job failed three times
-at "Trigger Render deploy" with HTTP 500 while status.render.com listed an
-incident on builds and deploys (listed 19:32 to 22:18 UTC, deploys for free
+**The Render outage lesson.** On 14 Oct the CI `deploy` job failed at
+"Trigger Render deploy" with HTTP 500 on three consecutive pushes (`88d9dd7`,
+`dc67e2c`, `cf08ee7`) and on the two job re-runs of the first two, five failed
+hook steps in all (counted from the incident file's timeline), while
+status.render.com listed an incident on builds and deploys (listed 19:32 to 22:18 UTC, deploys for free
 instances paused from 20:41 UTC). The later failures fall inside that window
 and are, in the incident file's words, "consistent with" the outage; the first
 failure began less than two minutes before the listing and is "consistent
@@ -178,20 +184,25 @@ code: the status page first, then `/health`, then the runbook decision tree
 `ops/incidents/2026-10-14-render-deploy-exit-127.md`: that one was our own
 configuration (a `dockerCommand` override in `render.yaml`), it crashed the
 service at start, and waiting would not have fixed it; the fix was to remove
-the override. The two look alike from the CI page, which is why the decision
-tree starts with the provider check. Since issue #38 the `deploy` job prints a
-`HINT:` pointing at the status page and the runbook on a 5xx or an unreachable
+the override. The two were found in different places: the exit-127 crash
+predates the `deploy` job, and the owner found it in the Render dashboard log,
+while the outage showed as a red `deploy` job (`curl: (22)`). The decision tree
+starts with the provider check so that a provider outage is ruled out before
+any code change. Since issue #38 the `deploy` job prints a `HINT:` pointing at the status page and the runbook on a 5xx or an unreachable
 hook, but that code has only run against a local dry run, not during a real
 outage.
 
 **Numbers.** Each with how it was obtained.
 
 - **Issues.** `gh issue list --state all --limit 100 --json number,state`, run
-  2026-10-15 09:29 UTC with `origin/main` at `42504ea`: 39 issues (#1 to #39,
-  none missing; the limit of 100 is above 39), 27 closed and 12 open. The
-  open ones are #27 to #37, triaged in issue #39 (ten labelled `deferred`, #35
-  labelled `wontfix`, all kept open), and #39 itself, which was in progress
-  when this was counted.
+  again on 2026-10-15 at about 10:05 UTC with `origin/main` at `527fc6b`: 39
+  issues in all (#1 to #39, none missing; the limit of 100 is above 39), 27
+  closed and 12 open. Of those 39, #39 itself is the issue this report belongs
+  to: it was still open at that count and is closed by the orchestrator after
+  the final check. Excluding #39, the other 38 issues are 27 closed and 11
+  open; the 11 are the backlog #27 to #37, triaged in issue #39 (ten labelled
+  `deferred`, #35 labelled `wontfix`, all kept open). Once #39 is closed the
+  total counts will read 28 closed and 11 open.
 - **QA FAIL verdicts: 3.** Counting rule: a QA FAIL is a comment headed
   `## QA: FAIL` on an issue. I read the comments of all 27 closed issues (the
   open ones have only the triage comments from #39, no QA verdict) and
@@ -215,9 +226,12 @@ outage.
   Engineer's work (both sources mention the failing step; not counted);
   **#12**, reopened after its QA PASS because the first real Render deploy
   crashed (a production failure, not a QA FAIL).
-- **Test counts**, from the summary line of each run on 2026-10-15
-  (09:16 to 09:20 UTC, Git Bash on Windows 11, started from commit `42504ea`;
-  the commits of issue #39 that followed change documentation only):
+- **Test counts**, from the summary line of each run in the matrix runs on
+  2026-10-15 at `42504ea` (first run, 09:16 to 09:20 UTC), `4d1c9ec` and
+  `527fc6b` (Git Bash on Windows 11). The commits since the first run changed
+  documentation only: `git diff --name-only 42504ea HEAD` lists `README.md`,
+  `_docs/decisions.md`, `docs/`, `ops/runbook.md` and `security/` Markdown
+  files and nothing else, so the code is the one the counts were measured on:
 
   | Command | Result |
   |---|---|

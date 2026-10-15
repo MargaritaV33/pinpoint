@@ -16,9 +16,13 @@ consecutive pushes because the deploy hook answered HTTP 500 (`curl` exit 22).
 status.render.com listed a Render incident, "Builds, deploys, and queued
 deploys are not starting in all regions", on 14 Oct 19:32-22:18 UTC, with
 deploys for free instances paused from 20:41 UTC. The owner re-ran the
-`deploy` job on 15 Oct at 06:38 UTC, the hook step succeeded, and production
-then served `51dfe85`. The cause of the failed deploys was Render's incident.
-Our own gap was how the first failure was handled: it was labelled transient
+`deploy` job on 15 Oct at 06:38 UTC and the hook step succeeded; which commit
+production then served is to be confirmed by a `GET /health` in the live
+diagnosis (part 4 of issue #38, not yet written). The later failures (20:48,
+20:56 and 21:00 UTC) fall inside the listed incident window and the pause, and
+are consistent with Render's incident being the cause. The first failure
+(19:30 to 19:31 UTC) began under two minutes before the 19:32 listing and is
+only consistent with it, not established. Our own gap was how the first failure was handled: it was labelled transient
 without opening the provider status page first.
 
 ## Timeline
@@ -31,7 +35,7 @@ CI times are the start and end of the "Trigger Render deploy" step of the
 | 14 Oct 19:28 | Run 38623992537 starts (push `88d9dd7`). | `gh run view` |
 | 14 Oct 19:30:51-19:30:57 | Attempt 1, hook step fails (`curl: (22)`, HTTP 500). | `gh run view`; usage report |
 | 14 Oct 19:31:27-19:31:33 | Attempt 2 (a re-run of the job), hook step fails the same way. | `gh run view`; usage report |
-| 14 Oct, about 19:31 onward | Live `/health` returns 502 on each of four checks over about two minutes. Exact times **not recorded**. | usage report |
+| 14 Oct, after 19:31, times not recorded | Live `/health` returned 502 on each of four checks over about two minutes. | usage report |
 | 14 Oct 19:32 | status.render.com lists the incident (start time as listed). The two hook failures above are less than two minutes before that listing (the page lists minutes only). | status.render.com |
 | 14 Oct 19:38 and 19:44 | Pushes `d139943` and `cd03812`: the hook step succeeds and `/health` reports the new commit (runs 38625084774 and 38625797747). The first failure is then logged as "a transient Render-side condition that cleared by itself". | `gh run view`; usage report |
 | 14 Oct 20:41 | status.render.com: deploys for free instances paused. The page states no resume time. | status.render.com |
@@ -44,13 +48,14 @@ CI times are the start and end of the "Trigger Render deploy" step of the
 | 14 Oct 22:18 | status.render.com lists the incident as resolved. | status.render.com |
 | 15 Oct 06:38:33 | The owner re-runs the `deploy` job of run 38634842001 (attempt 3). Hook step succeeds (06:38:34-06:38:35). | `gh run view` |
 | 15 Oct 06:38:35-06:42:31 | "Wait for /health" step runs, then is **cancelled** at 06:42:31; the run's conclusion is `cancelled`. By whom or why is **not recorded** in the run data. | `gh run view` |
-| 15 Oct | Production serves `51dfe85` (reported to the engineer by the orchestrator; to be re-checked by a `GET /health` in the live diagnosis, part 4 of issue #38). | orchestrator hand-off |
+| 15 Oct, after 06:38 | Which commit production serves after the re-run is **not established from the repo**. It is to be confirmed by the read-only `GET /health` of `ops/diagnosis-2026-10-15-cold-start.md` (part 4 of issue #38, not yet written). | none yet |
 
 ## Impact
 
 - Pushes `88d9dd7` (first failure), `dc67e2c` and `cf08ee7` did not deploy
   when pushed. The four application fixes of issue #26 (in `dc67e2c`) stayed
-  unverified in production until the 15 Oct re-run. [usage report]
+  unverified in production until a deploy succeeded. The 15 Oct re-run's hook
+  step succeeded; that they are live is to be confirmed by part 4. [usage report]
 - The live service did not answer `/health` during the observations above.
   Whether the site was unusable for users, and for how long, is **unknown**:
   no user report exists in the repo and the observations have no end time.
@@ -76,10 +81,10 @@ CI times are the start and end of the "Trigger Render deploy" step of the
 
 ## Detection
 
-- The failed `deploy` job was visible on each run. The first run's failure was
-  noticed by the orchestrator when recording the CI result; the provider
-  incident was identified when the owner reported it from the status page.
-  [usage report]
+- The failed `deploy` job was visible on each run. The usage report records the
+  first failure in the entry for issue #21's CI result, and records the
+  provider incident as identified when the owner reported it from the status
+  page. [usage report]
 - Nothing in the job pointed at the provider: the log said `curl: (22)` and the
   response body, with no hint about where to look.
 
@@ -117,10 +122,11 @@ What we do now:
 3. **Do not label a failure transient** until the status page has been checked
    and the check is written in the log entry.
 4. **Re-running an old run's `deploy` job** compares `/health` with that run's
-   own SHA. The 15 Oct re-run waited for `dc67e2c` while production served
-   `51dfe85`, a later commit, so it could not have matched. The job's final
-   message now says "service is up but serving a different commit" for that
-   case.
+   own SHA. The 15 Oct re-run of run 38634842001 waited for `dc67e2c`, which
+   is no longer the tip of `main` (`git log`: later commits exist, the latest
+   being `51dfe85`), so unless Render built exactly that commit the wait could
+   not match. The job's final message now says "service is up but serving a
+   different commit" for that case.
 
 ## What we do not know
 
@@ -131,8 +137,9 @@ What we do now:
 - Why the "Wait for /health" step of the 15 Oct attempt was cancelled, and by
   whom.
 - Whether Render's hook always deploys the tip of `main` rather than the commit
-  of the run that calls it. Production serving `51dfe85` is consistent with
-  that; it is not verified.
+  of the run that calls it. Which commit production serves after the
+  re-run is not established from the repo (part 4 will read it from `/health`);
+  until then this is open.
 - When free-instance deploys resumed: the status page states no resume time.
 - The times of the `/health` timeouts and the owner's report.
 - How long users were affected, if at all.
